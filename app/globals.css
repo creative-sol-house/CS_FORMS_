@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ---- DARK MODE ---- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+/* ====================== GLOBAL BACKGROUND ====================== */
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  /* Ambient dark gradient — replaces plain white */
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(59, 130, 246, 0.18), transparent 60%),
+    radial-gradient(1000px 500px at 90% 0%, rgba(99, 102, 241, 0.15), transparent 60%),
+    radial-gradient(800px 600px at 50% 110%, rgba(139, 92, 246, 0.12), transparent 60%),
+    linear-gradient(180deg, #0b1220 0%, #0f172a 40%, #111827 100%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ====================== ANIMATIONS ====================== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; max-height: 0; }
+  to   { opacity: 1; max-height: 600px; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-12px); }
+}
+
+/* ====================== UTILITIES ====================== */
+.input {
+  @apply w-full border border-white/10 rounded-lg px-3 py-2 text-white placeholder:text-gray-400 bg-white/5 focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
+.btn {
+  @apply bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition;
+}
+
+.btn-secondary {
+  @apply bg-white/10 text-gray-200 px-5 py-2 rounded-lg hover:bg-white/20 transition;
+}
+
+/* Smooth scrolling + mobile tap */
+html { scroll-behavior: smooth; }
+* { -webkit-tap-highlight-color: transparent; }
