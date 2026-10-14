@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import dns from "node:dns";
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
+dns.setServers(["8.8.8.8", "8.8.4.4"]); // Google DNS
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) throw new Error("MONGODB_URI missing in .env.local");

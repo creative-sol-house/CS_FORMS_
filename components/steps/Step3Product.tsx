@@ -1,7 +1,37 @@
 "use client";
 import { InquiryData } from "@/lib/types";
 
-const FEATURES = ["Chat", "SEO", "Dashboard", "Auth", "API", "CMS", "CRM", "Project Management", "Analytics", "Team Management", "Finance", "Other"];
+const FEATURES = [
+  // Finance & Accounting
+  "Accounting",
+  "Finance Management",
+  "Purchase Management",
+  "Vendor Management",
+  "Asset Management",
+
+  // Inventory & Products
+  "Inventory Management",
+  "Product Management",
+  "Store Management",
+
+  "CRM", "CMS", "Email Automation System", "Supplier Management",
+
+  // Projects & Teams
+  "Project Management",
+  "Team Management",
+  "Lead Management",
+  "HR & Payroll Management",
+
+  // Analytics & Reporting
+  "Analytics Management",
+  "Reports Management",
+
+  // Business Tools
+  "Business Proposal Engine",
+
+  // Fallback
+  "Other",
+];
 
 type Props = {
   data: InquiryData;
@@ -17,7 +47,13 @@ export default function Step3Commodity({ data, update, next, back }: Props) {
   const toggle = (arr: string[] = [], v: string) =>
     arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 
-  const valid = !!(data.commodityType?.trim() && data.commodityDelivery?.trim());
+  const valid = !!(
+    data.commodityType?.trim() &&
+    data.commodityName?.trim() &&
+    data.commodityFeatures?.length &&
+    data.commodityDelivery?.trim() &&
+    data.commodityRefs?.trim()
+  );
 
   return (
     <div className="space-y-5 animate-[fadeIn_0.35s_ease-out]">
@@ -32,7 +68,7 @@ export default function Step3Commodity({ data, update, next, back }: Props) {
             Commodity Details
           </h2>
           <p className="text-[13px] text-purple-600 mt-0.5">
-            Tell us about your commodity
+            Tell Us About Your Commodity
           </p>
         </div>
       </div>
@@ -41,16 +77,16 @@ export default function Step3Commodity({ data, update, next, back }: Props) {
         <Field label="Commodity Type" required>
           <input
             className={inputBase}
-            placeholder="e.g. Website Template, E-commerce, CRM…"
+            placeholder="E.g. Clothes, Electronics, Furniture…"
             value={data.commodityType || ""}
             onChange={(e) => update({ commodityType: e.target.value })}
           />
         </Field>
 
-        <Field label="Commodity Name" optional>
+        <Field label="Commodity Name" required>
           <input
             className={inputBase}
-            placeholder="e.g. Acme Dashboard"
+            placeholder="E.g. Air-Conditioner, Smartphone…"
             value={data.commodityName || ""}
             onChange={(e) => update({ commodityName: e.target.value })}
           />
@@ -58,7 +94,7 @@ export default function Step3Commodity({ data, update, next, back }: Props) {
 
         <div>
           <p className="text-[12px] font-semibold text-purple-800 mb-2 tracking-wide">
-            Features <span className="text-purple-500 font-normal">(optional)</span>
+            Features <span className="text-purple-700">*</span>
           </p>
           <div className="flex flex-wrap gap-2">
             {FEATURES.map((f) => {
@@ -84,13 +120,13 @@ export default function Step3Commodity({ data, update, next, back }: Props) {
         <Field label="Delivery Time" required>
           <input
             className={inputBase}
-            placeholder="e.g. ASAP, 1 month, 3 months…"
+            placeholder="E.g. ASAP, 1 Month, 3 Months…"
             value={data.commodityDelivery || ""}
             onChange={(e) => update({ commodityDelivery: e.target.value })}
           />
         </Field>
 
-        <Field label="Reference Links" optional>
+        <Field label="Reference Links" required>
           <input
             className={inputBase}
             placeholder="https://…"
@@ -120,20 +156,15 @@ export default function Step3Commodity({ data, update, next, back }: Props) {
 }
 
 function Field({
-  label, required, optional, children,
+  label, required, children,
 }: {
-  label: string; required?: boolean; optional?: boolean; children: React.ReactNode;
+  label: string; required?: boolean; children: React.ReactNode;
 }) {
   return (
     <div>
       <label className="flex items-center gap-1.5 text-[12px] font-semibold text-purple-800 mb-2 tracking-wide">
         {label}
         {required && <span className="text-purple-700">*</span>}
-        {optional && (
-          <span className="text-[10px] uppercase tracking-wider font-semibold text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded-md">
-            opt
-          </span>
-        )}
       </label>
       {children}
     </div>

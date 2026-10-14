@@ -1,16 +1,21 @@
-
-
 "use client";
 import { useState } from "react";
 import { InquiryDoc } from "@/lib/types";
 
-export default function AdminPage() {
+type ServiceFilter =
+  | "All"
+  | "Automation Software"
+  | "Web Development"
+  | "Logo Design"
+  | "Digital Marketing";
+
+export default function AdminClient() {
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
   const [inquiries, setInquiries] = useState<InquiryDoc[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState<"All" | "Commodity" | "Service">("All");
+  const [filter, setFilter] = useState<ServiceFilter>("All");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<InquiryDoc | null>(null);
 
@@ -68,7 +73,6 @@ export default function AdminPage() {
     return (
       <main className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-blue-50 via-white to-pink-50">
         <div className="w-full max-w-md animate-[fadeIn_0.35s_ease-out]">
-          {/* Logo */}
           <div className="flex flex-col items-center mb-8">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-pink-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
               <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -83,7 +87,6 @@ export default function AdminPage() {
             </p>
           </div>
 
-          {/* Card */}
           <div className="rounded-3xl bg-white border border-blue-100 shadow-xl shadow-blue-500/5 p-6 sm:p-8">
             <label className="block text-[12px] font-medium text-slate-800 mb-2 tracking-wide">
               Admin Password
@@ -141,27 +144,37 @@ export default function AdminPage() {
 
   // ================= DASHBOARD =================
   const filtered = inquiries.filter((i) => {
-    if (filter !== "All" && i.requirementType !== filter) return false;
+    if (filter !== "All" && i.serviceCategory !== filter) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
         i.fullName?.toLowerCase().includes(q) ||
         i.email?.toLowerCase().includes(q) ||
         i.companyName?.toLowerCase().includes(q) ||
-        i.projectTitle?.toLowerCase().includes(q)
+        i.projectTitle?.toLowerCase().includes(q) ||
+        i.brandName?.toLowerCase().includes(q)
       );
     }
     return true;
   });
 
   const total = inquiries.length;
-  const commodityCount = inquiries.filter((i) => i.requirementType === "Commodity").length;
-  const serviceCount = inquiries.filter((i) => i.requirementType === "Service").length;
+  const automationCount = inquiries.filter(
+    (i) => i.serviceCategory === "Automation Software"
+  ).length;
+  const webCount = inquiries.filter(
+    (i) => i.serviceCategory === "Web Development"
+  ).length;
+  const logoCount = inquiries.filter(
+    (i) => i.serviceCategory === "Logo Design"
+  ).length;
+  const marketingCount = inquiries.filter(
+    (i) => i.serviceCategory === "Digital Marketing"
+  ).length;
 
   return (
     <main className="min-h-screen p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-blue-50 via-white to-pink-50">
       <div className="max-w-7xl mx-auto">
-
         {/* ===== HEADER ===== */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div className="flex items-center gap-3.5">
@@ -200,9 +213,9 @@ export default function AdminPage() {
         </div>
 
         {/* ===== STATS ===== */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
           <StatCard
-            label="Total Inquiries"
+            label="Total"
             value={total}
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -212,54 +225,83 @@ export default function AdminPage() {
             accent="blue"
           />
           <StatCard
-            label="Commodity-based"
-            value={commodityCount}
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            }
-            accent="pink"
-          />
-          <StatCard
-            label="Service-based"
-            value={serviceCount}
+            label="Automation"
+            value={automationCount}
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             }
+            accent="pink"
+          />
+          <StatCard
+            label="Web Dev"
+            value={webCount}
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+              </svg>
+            }
             accent="indigo"
+          />
+          <StatCard
+            label="Logo"
+            value={logoCount}
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            }
+            accent="amber"
+          />
+          <StatCard
+            label="Marketing"
+            value={marketingCount}
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+              </svg>
+            }
+            accent="emerald"
           />
         </div>
 
         {/* ===== FILTERS ===== */}
-        <div className="rounded-2xl bg-white border border-blue-100 shadow-sm p-3 sm:p-4 mb-4 flex flex-col sm:flex-row gap-3">
+        <div className="rounded-2xl bg-white border border-blue-100 shadow-sm p-3 sm:p-4 mb-4 flex flex-col lg:flex-row gap-3">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
               className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl bg-blue-50/60 border border-blue-100 text-slate-900 placeholder:text-slate-500 outline-none transition-all duration-200 hover:bg-blue-50 focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
-              placeholder="Search name, email, company…"
+              placeholder="Search name, email, company, brand…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          <div className="flex gap-1.5 sm:gap-2 p-1 rounded-xl bg-blue-50/60 border border-blue-100">
-            {(["All", "Commodity", "Service"] as const).map((f) => (
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 p-1 rounded-xl bg-blue-50/60 border border-blue-100">
+            {(
+              [
+                "All",
+                "Automation Software",
+                "Web Development",
+                "Logo Design",
+                "Digital Marketing",
+              ] as const
+            ).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-[12.5px] font-semibold transition-all duration-200 ${
+                className={`px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-all duration-200 whitespace-nowrap ${
                   filter === f
                     ? "bg-gradient-to-r from-blue-500 to-pink-500 text-white shadow-md shadow-blue-500/20"
                     : "text-slate-900 hover:text-blue-800"
                 }`}
               >
-                {f}
+                {f === "Automation Software" ? "Automation" : f === "Web Development" ? "Web" : f === "Digital Marketing" ? "Marketing" : f}
               </button>
             ))}
           </div>
@@ -271,14 +313,15 @@ export default function AdminPage() {
         ) : (
           <div className="rounded-2xl bg-white border border-blue-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[800px]">
+              <table className="w-full text-sm min-w-[900px]">
                 <thead>
                   <tr className="text-left text-slate-900 text-[11px] uppercase tracking-widest bg-blue-50/60">
                     <th className="px-4 py-3 font-bold">Name</th>
                     <th className="px-4 py-3 font-bold">Email</th>
                     <th className="px-4 py-3 font-bold">Phone</th>
                     <th className="px-4 py-3 font-bold">Company</th>
-                    <th className="px-4 py-3 font-bold">Type</th>
+                    <th className="px-4 py-3 font-bold">Service</th>
+                    <th className="px-4 py-3 font-bold">Sub-Type</th>
                     <th className="px-4 py-3 font-bold">Project</th>
                     <th className="px-4 py-3 font-bold">Date</th>
                     <th className="px-4 py-3 font-bold text-right"></th>
@@ -290,23 +333,38 @@ export default function AdminPage() {
                       key={i._id}
                       className="hover:bg-blue-50/40 transition-colors group"
                     >
-                      <td className="px-4 py-3.5 font-medium text-slate-900">{i.fullName}</td>
+                      <td className="px-4 py-3.5 font-medium text-slate-900">
+                        {i.fullName}
+                      </td>
                       <td className="px-4 py-3.5 text-slate-800">{i.email}</td>
                       <td className="px-4 py-3.5 text-slate-800">{i.phone}</td>
-                      <td className="px-4 py-3.5 text-slate-800">{i.companyName || "—"}</td>
+                      <td className="px-4 py-3.5 text-slate-800">
+                        {i.companyName || "—"}
+                      </td>
                       <td className="px-4 py-3.5">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                            i.requirementType === "Commodity"
-                              ? "bg-blue-100 text-blue-900 border-blue-300"
-                              : "bg-pink-100 text-pink-900 border-pink-300"
-                          }`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            i.requirementType === "Commodity" ? "bg-blue-600" : "bg-pink-600"
-                          }`} />
-                          {i.requirementType}
-                        </span>
+                        <ServiceBadge category={i.serviceCategory} />
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {i.serviceCategory === "Automation Software" ? (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                              i.requirementType === "Commodity"
+                                ? "bg-blue-100 text-blue-900 border-blue-300"
+                                : "bg-pink-100 text-pink-900 border-pink-300"
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                i.requirementType === "Commodity"
+                                  ? "bg-blue-600"
+                                  : "bg-pink-600"
+                              }`}
+                            />
+                            {i.requirementType || "—"}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 text-xs">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 text-slate-800 truncate max-w-[150px]">
                         {i.projectTitle || i.commodityType || i.serviceType || "—"}
@@ -370,52 +428,46 @@ export default function AdminPage() {
 
             {/* Modal Body */}
             <div className="p-5 overflow-y-auto max-h-[60vh] space-y-5">
+              {/* Service selected */}
+              <Section title="Service Requested">
+                <Row
+                  label="Category"
+                  value={selected.serviceCategory || "—"}
+                />
+                {selected.serviceCategory === "Automation Software" && (
+                  <Row
+                    label="Sub-Type"
+                    value={selected.requirementType || "—"}
+                  />
+                )}
+              </Section>
+
               {/* Contact */}
               <Section title="Contact Info">
                 <Row label="Email" value={selected.email} />
                 <Row label="Phone" value={selected.phone} />
                 <Row label="Client Type" value={selected.clientType} />
-                {selected.companyName && <Row label="Company" value={selected.companyName} />}
-                {selected.designation && <Row label="Designation" value={selected.designation} />}
+                {selected.companyName && (
+                  <Row label="Company" value={selected.companyName} />
+                )}
+                {selected.designation && (
+                  <Row label="Designation" value={selected.designation} />
+                )}
               </Section>
 
-              {/* Commodity fields */}
-              {selected.requirementType === "Commodity" && (
-                <Section title="Commodity Details">
-                  {selected.commodityType && <Row label="Commodity Type" value={selected.commodityType} />}
-                  {selected.commodityName && <Row label="Commodity Name" value={selected.commodityName} />}
-                  {selected.commodityFeatures?.length ? (
-                    <Row label="Features" value={selected.commodityFeatures.join(", ")} />
-                  ) : null}
-                  {selected.commodityDelivery && <Row label="Delivery" value={selected.commodityDelivery} />}
-                  {selected.commodityRefs && <Row label="References" value={selected.commodityRefs} />}
-                </Section>
-              )}
-
-              {/* Service fields */}
-              {selected.requirementType === "Service" && (
-                <Section title="Service Details">
-                  {selected.serviceType && <Row label="Service Type" value={selected.serviceType} />}
-                  {selected.projectDescription && (
-                    <Row label="Description" value={selected.projectDescription} />
-                  )}
-                  {selected.serviceFeatures?.length ? (
-                    <Row label="Features" value={selected.serviceFeatures.join(", ")} />
-                  ) : null}
-                  {selected.timeline && <Row label="Timeline" value={selected.timeline} />}
-                  {selected.serviceRefs && <Row label="References" value={selected.serviceRefs} />}
-                </Section>
-              )}
-
-              {/* Project */}
+              {/* Project Info */}
               {(selected.projectTitle ||
                 selected.projectGoals ||
                 selected.targetAudience ||
                 selected.existingWebsite ||
                 selected.additionalNotes) && (
                 <Section title="Project Info">
-                  {selected.projectTitle && <Row label="Title" value={selected.projectTitle} />}
-                  {selected.projectGoals && <Row label="Goals" value={selected.projectGoals} />}
+                  {selected.projectTitle && (
+                    <Row label="Title" value={selected.projectTitle} />
+                  )}
+                  {selected.projectGoals && (
+                    <Row label="Goals" value={selected.projectGoals} />
+                  )}
                   {selected.targetAudience && (
                     <Row label="Audience" value={selected.targetAudience} />
                   )}
@@ -428,12 +480,272 @@ export default function AdminPage() {
                 </Section>
               )}
 
+              {/* Automation: Commodity */}
+              {selected.serviceCategory === "Automation Software" &&
+                selected.requirementType === "Commodity" && (
+                  <Section title="Commodity Details">
+                    {selected.commodityType && (
+                      <Row label="Type" value={selected.commodityType} />
+                    )}
+                    {selected.commodityName && (
+                      <Row label="Name" value={selected.commodityName} />
+                    )}
+                    {selected.commodityFeatures?.length ? (
+                      <Row
+                        label="Features"
+                        value={selected.commodityFeatures.join(", ")}
+                      />
+                    ) : null}
+                    {selected.commodityDelivery && (
+                      <Row label="Delivery" value={selected.commodityDelivery} />
+                    )}
+                    {selected.commodityRefs && (
+                      <Row label="References" value={selected.commodityRefs} />
+                    )}
+                  </Section>
+                )}
+
+              {/* Automation: Service */}
+              {selected.serviceCategory === "Automation Software" &&
+                selected.requirementType === "Service" && (
+                  <Section title="Service Details">
+                    {selected.serviceType && (
+                      <Row label="Service Type" value={selected.serviceType} />
+                    )}
+                    {selected.projectDescription && (
+                      <Row
+                        label="Description"
+                        value={selected.projectDescription}
+                      />
+                    )}
+                    {selected.serviceFeatures?.length ? (
+                      <Row
+                        label="Features"
+                        value={selected.serviceFeatures.join(", ")}
+                      />
+                    ) : null}
+                    {selected.timeline && (
+                      <Row label="Timeline" value={selected.timeline} />
+                    )}
+                    {selected.serviceRefs && (
+                      <Row label="References" value={selected.serviceRefs} />
+                    )}
+                  </Section>
+                )}
+
+              {/* Logo Design */}
+              {selected.serviceCategory === "Logo Design" && (
+                <Section title="Logo Design Brief">
+                  {selected.audienceDetail && (
+                    <Row label="Audience" value={selected.audienceDetail} />
+                  )}
+                  {selected.logoMessage && (
+                    <Row label="Message / Emotion" value={selected.logoMessage} />
+                  )}
+                  {selected.likedLogos && (
+                    <Row label="Liked Logos" value={selected.likedLogos} />
+                  )}
+                  {selected.logoType && (
+                    <Row label="Logo Type" value={selected.logoType} />
+                  )}
+                  {selected.colorPreferences && (
+                    <Row label="Colors" value={selected.colorPreferences} />
+                  )}
+                  {selected.tagline && (
+                    <Row label="Tagline" value={selected.tagline} />
+                  )}
+                  {selected.competitorBranding && (
+                    <Row
+                      label="Competitor Branding"
+                      value={selected.competitorBranding}
+                    />
+                  )}
+                </Section>
+              )}
+
+              {/* Web Development */}
+              {selected.serviceCategory === "Web Development" && (
+                <Section title="Website Brief">
+                  {selected.businessDescription && (
+                    <Row
+                      label="Business Description"
+                      value={selected.businessDescription}
+                    />
+                  )}
+                  {selected.usp && <Row label="USP" value={selected.usp} />}
+                  {selected.businessKeywords && (
+                    <Row label="Keywords" value={selected.businessKeywords} />
+                  )}
+                  {selected.referenceWebsites && (
+                    <Row
+                      label="Reference Sites"
+                      value={selected.referenceWebsites}
+                    />
+                  )}
+                  {selected.pagesNeeded && (
+                    <Row label="Pages Needed" value={selected.pagesNeeded} />
+                  )}
+                  {selected.featuresNeeded && (
+                    <Row label="Features Needed" value={selected.featuresNeeded} />
+                  )}
+                  {selected.websiteGoal && (
+                    <Row label="Website Goal" value={selected.websiteGoal} />
+                  )}
+                  {selected.launchDate && (
+                    <Row label="Launch Date" value={selected.launchDate} />
+                  )}
+                  {selected.additionalSuggestions && (
+                    <Row
+                      label="Additional Suggestions"
+                      value={selected.additionalSuggestions}
+                    />
+                  )}
+                </Section>
+              )}
+
+              {/* Digital Marketing */}
+              {selected.serviceCategory === "Digital Marketing" && (
+                <>
+                  <Section title="Brand Overview">
+                    {selected.brandName && (
+                      <Row label="Brand Name" value={selected.brandName} />
+                    )}
+                    {selected.natureOfBusiness && (
+                      <Row
+                        label="Nature of Business"
+                        value={selected.natureOfBusiness}
+                      />
+                    )}
+                    {selected.businessActivities && (
+                      <Row
+                        label="Business Activities"
+                        value={selected.businessActivities}
+                      />
+                    )}
+                    {selected.majorClients && (
+                      <Row label="Major Clients" value={selected.majorClients} />
+                    )}
+                    {selected.countryWiseMarket && (
+                      <Row
+                        label="Country-wise Market"
+                        value={selected.countryWiseMarket}
+                      />
+                    )}
+                    {selected.targetAudienceFull && (
+                      <Row
+                        label="Target Audience"
+                        value={selected.targetAudienceFull}
+                      />
+                    )}
+                  </Section>
+
+                  <Section title="Keywords & Products">
+                    {selected.businessKeywords50 && (
+                      <Row
+                        label="Business Keywords"
+                        value={selected.businessKeywords50}
+                      />
+                    )}
+                    {selected.totalProducts && (
+                      <Row
+                        label="Total Products"
+                        value={selected.totalProducts}
+                      />
+                    )}
+                    {selected.topRatedProducts && (
+                      <Row
+                        label="Top Rated Products"
+                        value={selected.topRatedProducts}
+                      />
+                    )}
+                    {selected.topProductKeywords && (
+                      <Row
+                        label="Top Product Keywords"
+                        value={selected.topProductKeywords}
+                      />
+                    )}
+                    {selected.importantPageOrProduct && (
+                      <Row
+                        label="Important Page / Product"
+                        value={selected.importantPageOrProduct}
+                      />
+                    )}
+                  </Section>
+
+                  <Section title="Digital Presence">
+                    {selected.socialMediaCredentials && (
+                      <Row
+                        label="Social Media"
+                        value={selected.socialMediaCredentials}
+                      />
+                    )}
+                    {selected.sampleBanners && (
+                      <Row
+                        label="Sample Banners"
+                        value={selected.sampleBanners}
+                      />
+                    )}
+                    {selected.sampleBlogs && (
+                      <Row label="Sample Blogs" value={selected.sampleBlogs} />
+                    )}
+                    {selected.sampleCopywriting && (
+                      <Row
+                        label="Sample Copywriting"
+                        value={selected.sampleCopywriting}
+                      />
+                    )}
+                    {selected.gscDetails && (
+                      <Row label="GSC Details" value={selected.gscDetails} />
+                    )}
+                    {selected.dynamicUrlRecs && (
+                      <Row
+                        label="Dynamic URL Recs"
+                        value={selected.dynamicUrlRecs}
+                      />
+                    )}
+                    {selected.existingSearchSubmissions && (
+                      <Row
+                        label="Existing Search Submissions"
+                        value={selected.existingSearchSubmissions}
+                      />
+                    )}
+                    {selected.relevantLink && (
+                      <Row label="Relevant Link" value={selected.relevantLink} />
+                    )}
+                    {selected.communityEngagements && (
+                      <Row
+                        label="Community Engagements"
+                        value={selected.communityEngagements}
+                      />
+                    )}
+                    {selected.serpPositioning && (
+                      <Row
+                        label="SERP Positioning"
+                        value={selected.serpPositioning}
+                      />
+                    )}
+                    {selected.competitorNamesUrls && (
+                      <Row
+                        label="Competitors"
+                        value={selected.competitorNamesUrls}
+                      />
+                    )}
+                  </Section>
+                </>
+              )}
+
               {/* Preferences */}
               {selected.preferredContactMethod && (
                 <Section title="Preferences">
-                  <Row label="Preferred Contact" value={selected.preferredContactMethod} />
+                  <Row
+                    label="Preferred Contact"
+                    value={selected.preferredContactMethod}
+                  />
                   {selected.preferredContactTime && (
-                    <Row label="Contact Time" value={selected.preferredContactTime} />
+                    <Row
+                      label="Contact Time"
+                      value={selected.preferredContactTime}
+                    />
                   )}
                 </Section>
               )}
@@ -469,6 +781,57 @@ export default function AdminPage() {
 
 /* ================= SUB-COMPONENTS ================= */
 
+function ServiceBadge({ category }: { category?: string }) {
+  const config: Record<
+    string,
+    { bg: string; text: string; border: string; dot: string; label: string }
+  > = {
+    "Automation Software": {
+      bg: "bg-purple-100",
+      text: "text-purple-900",
+      border: "border-purple-300",
+      dot: "bg-purple-600",
+      label: "Automation",
+    },
+    "Web Development": {
+      bg: "bg-blue-100",
+      text: "text-blue-900",
+      border: "border-blue-300",
+      dot: "bg-blue-600",
+      label: "Web Dev",
+    },
+    "Logo Design": {
+      bg: "bg-amber-100",
+      text: "text-amber-900",
+      border: "border-amber-300",
+      dot: "bg-amber-600",
+      label: "Logo",
+    },
+    "Digital Marketing": {
+      bg: "bg-emerald-100",
+      text: "text-emerald-900",
+      border: "border-emerald-300",
+      dot: "bg-emerald-600",
+      label: "Marketing",
+    },
+  };
+
+  const c = category && config[category] ? config[category] : null;
+
+  if (!c) {
+    return <span className="text-slate-500 text-xs">—</span>;
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${c.bg} ${c.text} ${c.border}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+      {c.label}
+    </span>
+  );
+}
+
 function StatCard({
   label,
   value,
@@ -478,25 +841,31 @@ function StatCard({
   label: string;
   value: number;
   icon: React.ReactNode;
-  accent: "blue" | "pink" | "indigo";
+  accent: "blue" | "pink" | "indigo" | "amber" | "emerald";
 }) {
   const styles = {
     blue: { bg: "bg-blue-50 border-blue-100", iconBg: "bg-blue-500", text: "text-blue-900" },
     pink: { bg: "bg-pink-50 border-pink-100", iconBg: "bg-pink-500", text: "text-pink-900" },
     indigo: { bg: "bg-indigo-50 border-indigo-100", iconBg: "bg-indigo-500", text: "text-indigo-900" },
+    amber: { bg: "bg-amber-50 border-amber-100", iconBg: "bg-amber-500", text: "text-amber-900" },
+    emerald: { bg: "bg-emerald-50 border-emerald-100", iconBg: "bg-emerald-500", text: "text-emerald-900" },
   }[accent];
 
   return (
-    <div className={`rounded-2xl ${styles.bg} border p-4 sm:p-5 transition-all duration-200 hover:shadow-md hover:shadow-blue-500/5`}>
+    <div
+      className={`rounded-2xl ${styles.bg} border p-4 transition-all duration-200 hover:shadow-md hover:shadow-blue-500/5`}
+    >
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[11px] font-semibold text-slate-800 uppercase tracking-widest">
+        <p className="text-[10.5px] font-semibold text-slate-800 uppercase tracking-widest">
           {label}
         </p>
-        <div className={`w-9 h-9 rounded-xl ${styles.iconBg} flex items-center justify-center text-white shrink-0 shadow-lg shadow-blue-500/20`}>
+        <div
+          className={`w-8 h-8 rounded-xl ${styles.iconBg} flex items-center justify-center text-white shrink-0 shadow-lg shadow-blue-500/20`}
+        >
           {icon}
         </div>
       </div>
-      <p className={`text-2xl sm:text-3xl font-bold ${styles.text}`}>{value}</p>
+      <p className={`text-2xl font-bold ${styles.text}`}>{value}</p>
     </div>
   );
 }
@@ -528,7 +897,7 @@ function Row({ label, value }: { label: string; value: string }) {
 function EmptyState() {
   return (
     <div className="rounded-2xl bg-white border border-blue-100 shadow-sm p-12 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-50 to-pink-50 border border-blue-100 flex items-center justify-center mx-auto mb-4">
+      <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-blue-50 to-pink-50 border border-blue-100 flex items-center justify-center mx-auto mb-4">
         <svg className="w-7 h-7 text-blue-800" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
         </svg>

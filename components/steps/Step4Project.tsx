@@ -13,7 +13,12 @@ const inputBase =
 
 export default function Step4Project({ data, update, next, back }: Props) {
   // ✅ VALIDATION
-  const valid = data.projectTitle?.trim() && data.projectGoals?.trim();
+  const valid =
+    data.projectTitle?.trim() &&
+    data.projectGoals?.trim() &&
+    data.targetAudience?.trim() &&
+    data.existingWebsite?.trim() &&
+    data.additionalNotes?.trim();
 
   return (
     <div className="space-y-5 animate-[fadeIn_0.35s_ease-out]">
@@ -28,7 +33,7 @@ export default function Step4Project({ data, update, next, back }: Props) {
             Project Details
           </h2>
           <p className="text-[13px] text-purple-600 mt-0.5">
-            Help us understand your vision
+            Help Us Understand Your Vision
           </p>
         </div>
       </div>
@@ -37,7 +42,7 @@ export default function Step4Project({ data, update, next, back }: Props) {
         <Field label="Project Title" required>
           <input
             className={inputBase}
-            placeholder="e.g. Acme Dashboard Redesign"
+            placeholder="E.g. Automation Software"
             value={data.projectTitle || ""}
             onChange={(e) => update({ projectTitle: e.target.value })}
           />
@@ -47,23 +52,23 @@ export default function Step4Project({ data, update, next, back }: Props) {
           <textarea
             rows={3}
             className={`${inputBase} resize-none`}
-            placeholder="What do you want to achieve with this project?"
+            placeholder="What Do You Want To Achieve With This Project?"
             value={data.projectGoals || ""}
             onChange={(e) => update({ projectGoals: e.target.value })}
           />
         </Field>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Target Audience" optional>
+          <Field label="Number Of Users" required>
             <input
               className={inputBase}
-              placeholder="e.g. Small businesses"
+              placeholder="Enter Numeric Value"
               value={data.targetAudience || ""}
               onChange={(e) => update({ targetAudience: e.target.value })}
             />
           </Field>
 
-          <Field label="Existing Website" optional>
+          <Field label="Existing Website" required>
             <input
               className={inputBase}
               placeholder="https://…"
@@ -73,11 +78,11 @@ export default function Step4Project({ data, update, next, back }: Props) {
           </Field>
         </div>
 
-        <Field label="Additional Notes" optional>
+        <Field label="Additional Notes" required>
           <textarea
             rows={2}
             className={`${inputBase} resize-none`}
-            placeholder="Anything else we should know?"
+            placeholder="Anything Else We Should Know?"
             value={data.additionalNotes || ""}
             onChange={(e) => update({ additionalNotes: e.target.value })}
           />
@@ -104,20 +109,15 @@ export default function Step4Project({ data, update, next, back }: Props) {
 }
 
 function Field({
-  label, required, optional, children,
+  label, required, children,
 }: {
-  label: string; required?: boolean; optional?: boolean; children: React.ReactNode;
+  label: string; required?: boolean; children: React.ReactNode;
 }) {
   return (
     <div>
       <label className="flex items-center gap-1.5 text-[12px] font-semibold text-purple-800 mb-2 tracking-wide">
         {label}
         {required && <span className="text-purple-700">*</span>}
-        {optional && (
-          <span className="text-[10px] uppercase tracking-wider font-semibold text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded-md">
-            opt
-          </span>
-        )}
       </label>
       {children}
     </div>

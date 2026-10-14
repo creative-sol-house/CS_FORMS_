@@ -13,6 +13,12 @@ const inputBase =
   "w-full px-3.5 py-2.5 text-sm rounded-xl bg-white border text-purple-900 placeholder:text-purple-400/70 outline-none transition-all duration-200 border-purple-900/15 hover:border-purple-700/40 focus:border-purple-700 focus:ring-4 focus:ring-purple-700/10";
 
 export default function Step5Consent({ data, update, back, submit, loading }: Props) {
+  const valid =
+    data.preferredContactMethod?.trim() &&
+    data.preferredContactTime?.trim() &&
+    data.agreeToTerms &&
+    data.subscribeUpdates;
+
   return (
     <div className="space-y-5 animate-[fadeIn_0.35s_ease-out]">
       <div className="flex items-center gap-3.5">
@@ -26,7 +32,7 @@ export default function Step5Consent({ data, update, back, submit, loading }: Pr
             Almost Done!
           </h2>
           <p className="text-[13px] text-purple-600 mt-0.5">
-            Just a few final details
+            Just A Few Final Details
           </p>
         </div>
       </div>
@@ -38,17 +44,17 @@ export default function Step5Consent({ data, update, back, submit, loading }: Pr
             value={data.preferredContactMethod || ""}
             onChange={(e) => update({ preferredContactMethod: e.target.value })}
           >
-            <option value="">Select a method</option>
+            <option value="">Select A Method</option>
             <option>Email</option>
             <option>Phone</option>
             <option>WhatsApp</option>
           </select>
         </Field>
 
-        <Field label="Preferred Contact Time" optional>
+        <Field label="Preferred Contact Time" required>
           <input
             className={inputBase}
-            placeholder="e.g. Weekdays 9am–5pm"
+            placeholder="E.g. Weekdays 9AM–5PM"
             value={data.preferredContactTime || ""}
             onChange={(e) => update({ preferredContactTime: e.target.value })}
           />
@@ -58,14 +64,15 @@ export default function Step5Consent({ data, update, back, submit, loading }: Pr
           <Checkbox
             checked={!!data.agreeToTerms}
             onChange={(v) => update({ agreeToTerms: v })}
-            label="I agree to the terms and privacy policy"
+            label="I Agree To The Terms And Privacy Policy"
             required
           />
 
           <Checkbox
             checked={!!data.subscribeUpdates}
             onChange={(v) => update({ subscribeUpdates: v })}
-            label="Subscribe to updates and news"
+            label="Subscribe To Updates And News"
+            required
           />
         </div>
       </div>
@@ -80,7 +87,7 @@ export default function Step5Consent({ data, update, back, submit, loading }: Pr
         </button>
 
         <button
-          disabled={!data.agreeToTerms || !data.preferredContactMethod || loading}
+          disabled={!valid || loading}
           onClick={submit}
           className="group px-7 py-2.5 rounded-xl text-[13px] font-semibold text-white bg-purple-700/70 hover:bg-purple-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-purple-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-md shadow-purple-700/25"
         >
@@ -107,20 +114,15 @@ export default function Step5Consent({ data, update, back, submit, loading }: Pr
 }
 
 function Field({
-  label, required, optional, children,
+  label, required, children,
 }: {
-  label: string; required?: boolean; optional?: boolean; children: React.ReactNode;
+  label: string; required?: boolean; children: React.ReactNode;
 }) {
   return (
     <div>
       <label className="flex items-center gap-1.5 text-[12px] font-semibold text-purple-800 mb-2 tracking-wide">
         {label}
         {required && <span className="text-purple-700">*</span>}
-        {optional && (
-          <span className="text-[10px] uppercase tracking-wider font-semibold text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded-md">
-            opt
-          </span>
-        )}
       </label>
       {children}
     </div>
