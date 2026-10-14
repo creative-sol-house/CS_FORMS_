@@ -1,5 +1,5 @@
 export type ClientType = "Individual" | "Business";
-export type RequirementType = "Product" | "Service";
+export type RequirementType = "Commodity" | "Service";
 
 export interface InquiryData {
   fullName: string;
@@ -10,28 +10,30 @@ export interface InquiryData {
   designation?: string;
   requirementType?: RequirementType;
 
-  productType?: string;
-  productName?: string;
-  productFeatures?: string[];
-  productBudget?: string;
-  productDelivery?: string;
-  productRefs?: string;
+  /* Commodity */
+  commodityType?: string;
+  commodityName?: string;
+  commodityFeatures?: string[];
+  commodityBudget?: string;
+  commodityDelivery?: string;
+  commodityRefs?: string;
 
+  /* Service */
   serviceType?: string;
   projectDescription?: string;
-  techPreference?: string[];
-  pagesOrScreens?: number;
   serviceFeatures?: string[];
   serviceBudget?: string;
   timeline?: string;
   serviceRefs?: string;
 
+  /* Project */
   projectTitle?: string;
   projectGoals?: string;
   targetAudience?: string;
   existingWebsite?: string;
   additionalNotes?: string;
 
+  /* Consent */
   preferredContactMethod?: string;
   preferredContactTime?: string;
   agreeToTerms: boolean;

@@ -15,6 +15,12 @@ const nextConfig: NextConfig = {
       },
     },
   },
+
+  /* 🔒 Hide route names from production browser bundles */
+  productionBrowserSourceMaps: false,
+
+  /* 🔒 Don't advertise the framework */
+  poweredByHeader: false,
 };
 
 export default nextConfig;

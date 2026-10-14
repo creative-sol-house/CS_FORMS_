@@ -1,10 +1,7 @@
 "use client";
 import { InquiryData } from "@/lib/types";
 
-const SERVICES = ["Website Dev", "Web App", "UI/UX", "SEO", "Maintenance", "Other"];
-const TECHS = ["React", "Next.js", "Node", "TypeScript", "WordPress", "Shopify"];
-const FEATURES = ["Login", "Payment", "Dashboard", "API", "CMS", "Notifications", "CRM", "Project Management", "Analytics", "Team Management", "Finance", "Other"];
-const TIMELINES = ["ASAP", "1 month", "3 months", "Flexible"];
+const FEATURES = ["Authen", "Dashboard", "API", "CMS", "Notifications", "CRM", "Project Management", "Analytics", "Team Management", "Finance", "Other"];
 
 type Props = {
   data: InquiryData;
@@ -13,24 +10,33 @@ type Props = {
   back: () => void;
 };
 
+const inputBase =
+  "w-full px-3.5 py-2.5 text-sm rounded-xl bg-white border text-purple-900 placeholder:text-purple-400/70 outline-none transition-all duration-200 border-purple-900/15 hover:border-purple-700/40 focus:border-purple-700 focus:ring-4 focus:ring-purple-700/10";
+
 export default function Step3Service({ data, update, next, back }: Props) {
   const toggle = (arr: string[] = [], v: string) =>
     arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+
+  // ✅ VALIDATION
+  const valid =
+    data.serviceType?.trim() &&
+    data.projectDescription?.trim() &&
+    data.timeline?.trim();
 
   return (
     <div className="space-y-5 animate-[fadeIn_0.35s_ease-out]">
       {/* HEADER */}
       <div className="flex items-center gap-3.5">
-        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-pink-500 flex items-center justify-center shrink-0">
+        <div className="w-11 h-11 rounded-2xl bg-purple-700 flex items-center justify-center shrink-0 shadow-md shadow-purple-700/20">
           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
           </svg>
         </div>
         <div>
-          <h2 className="text-[17px] font-semibold text-slate-800 leading-tight tracking-tight">
+          <h2 className="text-[17px] font-bold text-purple-900 leading-tight tracking-tight">
             Service Details
           </h2>
-          <p className="text-[13px] text-slate-500 mt-0.5">
+          <p className="text-[13px] text-purple-600 mt-0.5">
             Describe the service you need
           </p>
         </div>
@@ -39,68 +45,28 @@ export default function Step3Service({ data, update, next, back }: Props) {
       {/* FIELDS */}
       <div className="space-y-5">
         <Field label="Service Type" required>
-          <select
-            className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-blue-50/60 text-slate-800 outline-none transition-all duration-200 hover:bg-blue-50 focus:bg-white focus:ring-4 focus:ring-blue-500/10 appearance-none cursor-pointer"
+          <input
+            className={inputBase}
+            placeholder="e.g. Website Dev, Web App, UI/UX…"
             value={data.serviceType || ""}
             onChange={(e) => update({ serviceType: e.target.value })}
-          >
-            <option value="">Select service type</option>
-            {SERVICES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
+          />
         </Field>
 
         <Field label="Project Description" required>
           <textarea
             rows={3}
-            className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-blue-50/60 text-slate-800 placeholder:text-slate-400 outline-none transition-all duration-200 hover:bg-blue-50 focus:bg-white focus:ring-4 focus:ring-blue-500/10 resize-none"
+            className={`${inputBase} resize-none`}
             placeholder="Describe your project…"
             value={data.projectDescription || ""}
             onChange={(e) => update({ projectDescription: e.target.value })}
           />
         </Field>
 
-        {/* TECH */}
-        <div>
-          <p className="text-[12px] font-medium text-slate-600 mb-2 tracking-wide">
-            Tech Preference
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {TECHS.map((t) => {
-              const active = data.techPreference?.includes(t);
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => update({ techPreference: toggle(data.techPreference, t) })}
-                  className={`px-3.5 py-1.5 rounded-full text-[12.5px] font-medium transition-all duration-200 ${
-                    active
-                      ? "bg-gradient-to-r from-blue-500 to-pink-500 text-white"
-                      : "bg-blue-50/70 text-slate-600 hover:bg-blue-100"
-                  }`}
-                >
-                  {t}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <Field label="Pages / Screens" optional>
-          <input
-            type="number"
-            className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-blue-50/60 text-slate-800 placeholder:text-slate-400 outline-none transition-all duration-200 hover:bg-blue-50 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
-            placeholder="e.g. 12"
-            value={data.pagesOrScreens || ""}
-            onChange={(e) => update({ pagesOrScreens: +e.target.value })}
-          />
-        </Field>
-
         {/* FEATURES */}
         <div>
-          <p className="text-[12px] font-medium text-slate-600 mb-2 tracking-wide">
-            Features
+          <p className="text-[12px] font-semibold text-purple-800 mb-2 tracking-wide">
+            Features <span className="text-purple-500 font-normal">(optional)</span>
           </p>
           <div className="flex flex-wrap gap-2">
             {FEATURES.map((f) => {
@@ -110,10 +76,10 @@ export default function Step3Service({ data, update, next, back }: Props) {
                   key={f}
                   type="button"
                   onClick={() => update({ serviceFeatures: toggle(data.serviceFeatures, f) })}
-                  className={`px-3.5 py-1.5 rounded-full text-[12.5px] font-medium transition-all duration-200 ${
+                  className={`px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold transition-all duration-200 ${
                     active
-                      ? "bg-gradient-to-r from-blue-500 to-pink-500 text-white"
-                      : "bg-blue-50/70 text-slate-600 hover:bg-blue-100"
+                      ? "bg-purple-700 text-white shadow-md shadow-purple-700/25"
+                      : "bg-white text-purple-700 border border-purple-900/15 hover:border-purple-700/40 hover:bg-purple-50/50"
                   }`}
                 >
                   {f}
@@ -123,23 +89,18 @@ export default function Step3Service({ data, update, next, back }: Props) {
           </div>
         </div>
 
-        {/* TIMELINE (budget removed) */}
         <Field label="Timeline" required>
-          <select
-            className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-pink-50/60 text-slate-800 outline-none transition-all duration-200 hover:bg-pink-50 focus:bg-white focus:ring-4 focus:ring-pink-500/10 appearance-none cursor-pointer"
+          <input
+            className={inputBase}
+            placeholder="e.g. ASAP, 1 month, 3 months…"
             value={data.timeline || ""}
             onChange={(e) => update({ timeline: e.target.value })}
-          >
-            <option value="">Timeline</option>
-            {TIMELINES.map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
+          />
         </Field>
 
         <Field label="Reference Links" optional>
           <input
-            className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-blue-50/60 text-slate-800 placeholder:text-slate-400 outline-none transition-all duration-200 hover:bg-blue-50 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+            className={inputBase}
             placeholder="https://…"
             value={data.serviceRefs || ""}
             onChange={(e) => update({ serviceRefs: e.target.value })}
@@ -151,13 +112,14 @@ export default function Step3Service({ data, update, next, back }: Props) {
       <div className="flex items-center justify-between pt-2">
         <button
           onClick={back}
-          className="px-5 py-2.5 rounded-xl text-[13px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all duration-200"
+          className="px-5 py-2.5 rounded-xl text-[13px] font-semibold text-purple-700 bg-white border border-purple-900/15 hover:bg-purple-50/50 hover:border-purple-700/40 transition-all duration-200"
         >
           ← Back
         </button>
         <button
+          disabled={!valid}
           onClick={next}
-          className="px-7 py-2.5 rounded-xl text-[13px] font-semibold text-white bg-gradient-to-r from-blue-500 to-pink-500 hover:from-blue-600 hover:to-pink-600 transition-all duration-200"
+          className="px-7 py-2.5 rounded-xl text-[13px] font-semibold text-white bg-purple-700 hover:bg-purple-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-purple-700 transition-all duration-200 shadow-md shadow-purple-700/25"
         >
           Next →
         </button>
@@ -166,25 +128,18 @@ export default function Step3Service({ data, update, next, back }: Props) {
   );
 }
 
-/* Shared Field */
 function Field({
-  label,
-  required,
-  optional,
-  children,
+  label, required, optional, children,
 }: {
-  label: string;
-  required?: boolean;
-  optional?: boolean;
-  children: React.ReactNode;
+  label: string; required?: boolean; optional?: boolean; children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="flex items-center gap-1.5 text-[12px] font-medium text-slate-600 mb-2 tracking-wide">
+      <label className="flex items-center gap-1.5 text-[12px] font-semibold text-purple-800 mb-2 tracking-wide">
         {label}
-        {required && <span className="text-pink-500">*</span>}
+        {required && <span className="text-purple-700">*</span>}
         {optional && (
-          <span className="text-[10px] uppercase tracking-wider font-medium text-slate-500 bg-blue-50 px-1.5 py-0.5 rounded-md">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded-md">
             opt
           </span>
         )}

@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #0b1220;
+  --foreground: #eaf2ff;
 }
 
 @theme inline {
@@ -10,14 +10,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-/* ---- DARK MODE ---- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 /* ====================== GLOBAL BACKGROUND ====================== */
@@ -29,7 +21,6 @@ body {
 body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
-  /* Ambient dark gradient — replaces plain white */
   background:
     radial-gradient(1200px 600px at 10% -10%, rgba(59, 130, 246, 0.18), transparent 60%),
     radial-gradient(1000px 500px at 90% 0%, rgba(99, 102, 241, 0.15), transparent 60%),
@@ -58,7 +49,7 @@ body {
 
 /* ====================== UTILITIES ====================== */
 .input {
-  @apply w-full border border-white/10 rounded-lg px-3 py-2 text-white placeholder:text-gray-400 bg-white/5 focus:outline-none focus:ring-2 focus:ring-blue-500;
+  @apply w-full border border-white/10 rounded-lg px-3 py-2 text-white placeholder:text-blue-200/40 bg-white/5 focus:outline-none focus:ring-2 focus:ring-blue-500;
 }
 
 .btn {
@@ -66,7 +57,7 @@ body {
 }
 
 .btn-secondary {
-  @apply bg-white/10 text-gray-200 px-5 py-2 rounded-lg hover:bg-white/20 transition;
+  @apply bg-white/10 text-blue-100 px-5 py-2 rounded-lg hover:bg-white/20 transition;
 }
 
 /* Smooth scrolling + mobile tap */
