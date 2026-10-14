@@ -66,11 +66,19 @@ export default function Home() {
 </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <p className="text-center text-xs text-slate-400 mt-6">
-          © 2026 <span className="text-amber-400 font-medium">Creative Sol House</span>. All rights reserved.
-        </p>
+{/* Footer */}
+<p className="text-center text-xs text-slate-400 mt-6">
+  © 2026 <span className="text-amber-400 font-medium">Creative Sol House</span>. All rights reserved.
+  {" · "}
+  <a
+    href="https://cshouse.net"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-amber-400 font-medium hover:text-amber-300 underline-offset-2 hover:underline transition-colors"
+  >
+    cshouse.net
+  </a>
+</p>
       </div>
     </main>
   );
