@@ -12,12 +12,12 @@ const inputBase =
   "w-full px-3.5 py-2.5 text-sm rounded-xl bg-white border text-purple-900 placeholder:text-purple-400/70 outline-none transition-all duration-200 border-purple-900/15 hover:border-purple-700/40 focus:border-purple-700 focus:ring-4 focus:ring-purple-700/10";
 
 export default function Step3Project({ data, update, next, back }: Props) {
+  // Only truly essential fields are mandatory.
+  // "Existing Website" and "Additional Notes" are OPTIONAL.
   const valid =
     data.projectTitle?.trim() &&
     data.projectGoals?.trim() &&
-    data.targetAudience?.trim() &&
-    data.existingWebsite?.trim() &&
-    data.additionalNotes?.trim();
+    data.targetAudience?.trim();
 
   return (
     <div className="space-y-5 animate-[fadeIn_0.35s_ease-out]">
@@ -67,21 +67,23 @@ export default function Step3Project({ data, update, next, back }: Props) {
             />
           </Field>
 
-          <Field label="Existing Website" required>
+          {/* ✅ OPTIONAL — no asterisk, no validation */}
+          <Field label="Existing Website" optional>
             <input
               className={inputBase}
-              placeholder="https://…"
+              placeholder="https://… (optional)"
               value={data.existingWebsite || ""}
               onChange={(e) => update({ existingWebsite: e.target.value })}
             />
           </Field>
         </div>
 
-        <Field label="Additional Notes" required>
+        {/* ✅ OPTIONAL — no asterisk, no validation */}
+        <Field label="Additional Notes" optional>
           <textarea
             rows={2}
             className={`${inputBase} resize-none`}
-            placeholder="Anything Else We Should Know?"
+            placeholder="Anything Else We Should Know? (optional)"
             value={data.additionalNotes || ""}
             onChange={(e) => update({ additionalNotes: e.target.value })}
           />
@@ -108,15 +110,26 @@ export default function Step3Project({ data, update, next, back }: Props) {
 }
 
 function Field({
-  label, required, children,
+  label,
+  required,
+  optional,
+  children,
 }: {
-  label: string; required?: boolean; children: React.ReactNode;
+  label: string;
+  required?: boolean;
+  optional?: boolean;
+  children: React.ReactNode;
 }) {
   return (
     <div>
       <label className="flex items-center gap-1.5 text-[12px] font-semibold text-purple-800 mb-2 tracking-wide">
         {label}
         {required && <span className="text-purple-700">*</span>}
+        {optional && (
+          <span className="text-purple-400 font-medium text-[10.5px] tracking-normal normal-case">
+            (optional)
+          </span>
+        )}
       </label>
       {children}
     </div>
