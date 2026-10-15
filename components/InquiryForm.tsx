@@ -18,6 +18,7 @@ const initial: InquiryData = {
   phone: "",
   clientType: "Individual",
   agreeToTerms: false,
+  consultantName: ""
 };
 
 /**

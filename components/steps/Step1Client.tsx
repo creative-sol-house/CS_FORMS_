@@ -27,6 +27,7 @@ export default function Step1Client({ data, update, next, back }: Props) {
     data.email?.trim() &&
     data.phone?.trim() &&
     data.clientType?.trim() &&
+    data.consultantName?.trim() && // ← NEW: Mandatory validation
     emailValid &&
     phoneValid &&
     (data.clientType === "Individual" ||
@@ -90,6 +91,18 @@ export default function Step1Client({ data, update, next, back }: Props) {
               })}
             </div>
           </div>
+        </div>
+
+        {/* NEW: Consultant Name Field - Mandatory */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <Field label="Consultant Name" required>
+            <input
+              className={`${inputBase} ${inputIdle}`}
+              placeholder="Enter Consultant Name"
+              value={data.consultantName || ""}
+              onChange={(e) => update({ consultantName: e.target.value })}
+            />
+          </Field>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

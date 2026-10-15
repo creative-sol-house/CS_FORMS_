@@ -17,6 +17,7 @@ export interface InquiryData {
   email: string;
   phone: string;
   clientType: ClientType;
+  consultantName: string; // ← NEW: Mandatory field
   companyName?: string;
   designation?: string;
 
