@@ -71,46 +71,36 @@ export default function AdminClient() {
   // ================= LOGIN SCREEN =================
   if (!authed) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-4 bg-[#0a0a0f] relative overflow-hidden">
-        {/* Ambient background */}
-        <div className="absolute inset-0 opacity-40">
-          <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-600/20 blur-[120px]" />
-          <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-amber-500/10 blur-[120px]" />
+      <main className="min-h-screen flex items-center justify-center px-4 bg-[#fafaf9] relative overflow-hidden">
+        {/* Subtle decorative background */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-stone-300 to-transparent" />
+          <div className="absolute -top-40 -right-40 w-[500px] h-[500px] rounded-full bg-indigo-100/40 blur-[100px]" />
+          <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full bg-amber-100/40 blur-[100px]" />
         </div>
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-          }}
-        />
 
-        <div className="w-full max-w-[420px] relative animate-[fadeIn_0.5s_ease-out]">
-          <div className="flex flex-col items-center mb-10">
-            <div className="relative">
-              <div className="absolute inset-0 bg-amber-400/30 blur-2xl rounded-full" />
-              <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-2xl shadow-indigo-900/50 ring-1 ring-white/10">
-                <svg className="w-6 h-6 text-amber-300" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
+        <div className="w-full max-w-[400px] relative animate-[fadeIn_0.5s_ease-out]">
+          <div className="flex flex-col items-center mb-9">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center shadow-lg shadow-indigo-900/20 ring-1 ring-indigo-900/10">
+              <svg className="w-5 h-5 text-amber-300" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
             </div>
-            <h1 className="text-[26px] font-semibold text-white mt-6 tracking-tight">
+            <h1 className="text-[24px] font-semibold text-stone-900 mt-6 tracking-tight">
               Admin Console
             </h1>
-            <p className="text-[13px] text-slate-400 mt-1.5 font-light">
-              Secure access to inquiry management
+            <p className="text-[13px] text-stone-500 mt-1.5">
+              Sign in to manage client inquiries
             </p>
           </div>
 
-          <div className="rounded-3xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] shadow-2xl shadow-black/40 p-7">
-            <label className="block text-[11px] font-medium text-slate-400 mb-2.5 tracking-[0.15em] uppercase">
+          <div className="rounded-2xl bg-white border border-stone-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02),0_8px_24px_-8px_rgba(0,0,0,0.06)] p-6">
+            <label className="block text-[11px] font-semibold text-stone-700 mb-2 tracking-[0.08em] uppercase">
               Access Key
             </label>
             <input
               type="password"
-              className="w-full px-4 py-3.5 text-sm rounded-xl bg-black/30 border border-white/[0.08] text-white placeholder:text-slate-600 outline-none transition-all duration-300 hover:border-white/[0.15] focus:border-indigo-500/60 focus:ring-4 focus:ring-indigo-500/10 focus:bg-black/40"
+              className="w-full px-3.5 py-3 text-sm rounded-lg bg-stone-50 border border-stone-200 text-stone-900 placeholder:text-stone-400 outline-none transition-all duration-200 hover:border-stone-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:bg-white"
               placeholder="••••••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -119,8 +109,8 @@ export default function AdminClient() {
             />
 
             {error && (
-              <div className="mt-3.5 flex items-center gap-2.5 text-rose-300 text-[12px] bg-rose-500/[0.08] border border-rose-500/20 rounded-xl px-3.5 py-3">
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <div className="mt-3 flex items-center gap-2 text-rose-700 text-[12px] bg-rose-50 border border-rose-200 rounded-lg px-3 py-2.5">
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 {error}
@@ -130,7 +120,7 @@ export default function AdminClient() {
             <button
               onClick={login}
               disabled={loading || !password}
-              className="group mt-6 w-full px-5 py-3.5 rounded-xl font-medium text-[13px] tracking-wide text-slate-900 bg-gradient-to-b from-amber-200 to-amber-400 hover:from-amber-100 hover:to-amber-300 disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-amber-500/10 transition-all duration-300 flex items-center justify-center gap-2"
+              className="group mt-5 w-full px-5 py-3 rounded-lg font-semibold text-[13px] text-white bg-stone-900 hover:bg-stone-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shadow-sm"
             >
               {loading ? (
                 <>
@@ -138,12 +128,12 @@ export default function AdminClient() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Authenticating
+                  Authenticating…
                 </>
               ) : (
                 <>
-                  Unlock Dashboard
-                  <svg className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  Continue
+                  <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
                 </>
@@ -151,8 +141,8 @@ export default function AdminClient() {
             </button>
           </div>
 
-          <p className="text-center text-[11px] text-slate-600 mt-6 tracking-wider uppercase">
-            End-to-end encrypted · Authorized personnel only
+          <p className="text-center text-[11px] text-stone-400 mt-6 tracking-wide">
+            Authorized access only · Activity is logged
           </p>
         </div>
       </main>
@@ -184,54 +174,45 @@ export default function AdminClient() {
   const marketingCount = inquiries.filter((i) => i.serviceCategory === "Digital Marketing").length;
 
   return (
-    <main className="min-h-screen bg-[#0a0a0f] text-slate-200 relative">
-      {/* Ambient background */}
-      <div className="fixed inset-0 pointer-events-none opacity-50">
-        <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[35%] h-[35%] rounded-full bg-amber-500/[0.06] blur-[120px]" />
-      </div>
-
-      <div className="relative max-w-[1400px] mx-auto px-5 sm:px-8 lg:px-10 py-8 lg:py-10">
+    <main className="min-h-screen bg-[#fafaf9] text-stone-900">
+      <div className="max-w-[1400px] mx-auto px-5 sm:px-8 lg:px-10 py-8 lg:py-10">
         {/* ===== HEADER ===== */}
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 mb-10">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="absolute inset-0 bg-indigo-500/30 blur-xl rounded-2xl" />
-              <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center ring-1 ring-white/10 shadow-xl shadow-indigo-900/40">
-                <svg className="w-5 h-5 text-amber-300" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 mb-9">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center ring-1 ring-indigo-900/10 shadow-md shadow-indigo-900/10">
+              <svg className="w-5 h-5 text-amber-300" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
             </div>
             <div>
               <div className="flex items-center gap-2.5">
-                <h1 className="text-[19px] sm:text-[22px] font-semibold text-white tracking-tight">
-                  Inquiry Management
+                <h1 className="text-[19px] sm:text-[21px] font-semibold text-stone-900 tracking-tight">
+                  Inquiries
                 </h1>
-                <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 tracking-wider uppercase">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 tracking-wide">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   Live
                 </span>
               </div>
-              <p className="text-[13px] text-slate-500 mt-1 font-light">
+              <p className="text-[13px] text-stone-500 mt-0.5">
                 {total} {total === 1 ? "submission" : "submissions"} · Updated just now
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <button
               onClick={refresh}
-              className="group px-4 py-2.5 rounded-xl text-[12.5px] font-medium text-slate-300 bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all duration-300 flex items-center gap-2"
+              className="group px-3.5 py-2 rounded-lg text-[12.5px] font-medium text-stone-700 bg-white border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all duration-200 flex items-center gap-2 shadow-sm"
             >
-              <svg className="w-3.5 h-3.5 transition-transform duration-500 group-hover:rotate-180" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 transition-transform duration-500 group-hover:rotate-180 text-stone-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
               Refresh
             </button>
             <a
               href="/"
-              className="px-4 py-2.5 rounded-xl text-[12.5px] font-medium text-slate-900 bg-gradient-to-b from-amber-200 to-amber-400 hover:from-amber-100 hover:to-amber-300 shadow-lg shadow-amber-500/10 transition-all duration-300"
+              className="px-3.5 py-2 rounded-lg text-[12.5px] font-medium text-white bg-stone-900 hover:bg-stone-800 transition-all duration-200 shadow-sm"
             >
               Public Form
             </a>
@@ -239,8 +220,8 @@ export default function AdminClient() {
         </header>
 
         {/* ===== STATS ===== */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
-          <StatCard label="Total" value={total} accent="indigo" featured />
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 mb-7">
+          <StatCard label="Total" value={total} accent="stone" featured />
           <StatCard label="Automation" value={automationCount} accent="violet" />
           <StatCard label="Web Dev" value={webCount} accent="sky" />
           <StatCard label="Logo" value={logoCount} accent="amber" />
@@ -248,20 +229,20 @@ export default function AdminClient() {
         </div>
 
         {/* ===== FILTERS ===== */}
-        <div className="rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/[0.06] p-3 sm:p-4 mb-5 flex flex-col lg:flex-row gap-3">
+        <div className="rounded-xl bg-white border border-stone-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.02)] p-3 mb-4 flex flex-col lg:flex-row gap-3">
           <div className="relative flex-1">
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
-              className="w-full pl-11 pr-4 py-3 text-sm rounded-xl bg-black/20 border border-white/[0.06] text-white placeholder:text-slate-600 outline-none transition-all duration-300 hover:border-white/[0.12] focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 focus:bg-black/30"
+              className="w-full pl-10 pr-3 py-2.5 text-sm rounded-lg bg-stone-50 border border-stone-200 text-stone-900 placeholder:text-stone-400 outline-none transition-all duration-200 hover:border-stone-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:bg-white"
               placeholder="Search by name, email, phone, consultant…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          <div className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-black/20 border border-white/[0.06]">
+          <div className="flex flex-wrap gap-1 p-1 rounded-lg bg-stone-100/80 border border-stone-200/60">
             {(
               [
                 "All",
@@ -274,10 +255,10 @@ export default function AdminClient() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-300 whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-200 whitespace-nowrap ${
                   filter === f
-                    ? "bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-900/40 ring-1 ring-white/10"
-                    : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                    ? "bg-white text-stone-900 shadow-sm ring-1 ring-stone-200"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-white/60"
                 }`}
               >
                 {f === "Automation Software" ? "Automation" : f === "Web Development" ? "Web" : f === "Digital Marketing" ? "Marketing" : f}
@@ -290,79 +271,79 @@ export default function AdminClient() {
         {filtered.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="rounded-2xl bg-white/[0.02] backdrop-blur-md border border-white/[0.06] overflow-hidden shadow-2xl shadow-black/20">
+          <div className="rounded-xl bg-white border border-stone-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[1050px]">
                 <thead>
-                  <tr className="text-left bg-white/[0.02] border-b border-white/[0.06]">
+                  <tr className="text-left bg-stone-50/80 border-b border-stone-200">
                     {["Name", "Consultant", "Email", "Phone", "Company", "Service", "Sub-Type", "Project", "Date", ""].map((h, idx) => (
                       <th
                         key={idx}
-                        className={`px-5 py-4 text-[10.5px] font-semibold text-slate-500 uppercase tracking-[0.15em] ${idx === 9 ? "text-right" : ""}`}
+                        className={`px-5 py-3.5 text-[10.5px] font-semibold text-stone-500 uppercase tracking-[0.1em] ${idx === 9 ? "text-right" : ""}`}
                       >
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/[0.04]">
+                <tbody className="divide-y divide-stone-100">
                   {filtered.map((i) => (
                     <tr
                       key={i._id}
-                      className="hover:bg-white/[0.03] transition-colors duration-200 group"
+                      className="hover:bg-stone-50/60 transition-colors duration-150 group"
                     >
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500/30 to-indigo-700/30 border border-white/[0.08] flex items-center justify-center text-[11px] font-semibold text-indigo-200 shrink-0">
+                          <div className="w-7 h-7 rounded-md bg-stone-100 border border-stone-200 flex items-center justify-center text-[11px] font-semibold text-stone-700 shrink-0">
                             {i.fullName?.charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-medium text-white text-[13.5px]">{i.fullName}</span>
+                          <span className="font-medium text-stone-900 text-[13.5px]">{i.fullName}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-violet-500/10 text-violet-200 border border-violet-500/20">
+                      <td className="px-5 py-3.5">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium bg-violet-50 text-violet-700 border border-violet-200">
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                           </svg>
                           {i.consultantName || "—"}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-slate-400 text-[13px]">{i.email}</td>
-                      <td className="px-5 py-4 text-slate-400 text-[13px] whitespace-nowrap">{i.phone}</td>
-                      <td className="px-5 py-4 text-slate-400 text-[13px]">{i.companyName || <span className="text-slate-600">—</span>}</td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-3.5 text-stone-600 text-[13px]">{i.email}</td>
+                      <td className="px-5 py-3.5 text-stone-600 text-[13px] whitespace-nowrap">{i.phone}</td>
+                      <td className="px-5 py-3.5 text-stone-600 text-[13px]">{i.companyName || <span className="text-stone-300">—</span>}</td>
+                      <td className="px-5 py-3.5">
                         <ServiceBadge category={i.serviceCategory} />
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-3.5">
                         {i.serviceCategory === "Automation Software" ? (
                           <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border ${
+                            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium border ${
                               i.requirementType === "Commodity"
-                                ? "bg-sky-500/10 text-sky-200 border-sky-500/20"
-                                : "bg-pink-500/10 text-pink-200 border-pink-500/20"
+                                ? "bg-sky-50 text-sky-700 border-sky-200"
+                                : "bg-pink-50 text-pink-700 border-pink-200"
                             }`}
                           >
                             <span
                               className={`w-1.5 h-1.5 rounded-full ${
-                                i.requirementType === "Commodity" ? "bg-sky-400" : "bg-pink-400"
+                                i.requirementType === "Commodity" ? "bg-sky-500" : "bg-pink-500"
                               }`}
                             />
                             {i.requirementType || "—"}
                           </span>
                         ) : (
-                          <span className="text-slate-600 text-xs">—</span>
+                          <span className="text-stone-300 text-xs">—</span>
                         )}
                       </td>
-                      <td className="px-5 py-4 text-slate-400 text-[12.5px] truncate max-w-[160px]">
-                        {i.projectTitle || i.commodityType || i.serviceType || <span className="text-slate-600">—</span>}
+                      <td className="px-5 py-3.5 text-stone-600 text-[12.5px] truncate max-w-[160px]">
+                        {i.projectTitle || i.commodityType || i.serviceType || <span className="text-stone-300">—</span>}
                       </td>
-                      <td className="px-5 py-4 text-slate-500 text-[12px] whitespace-nowrap font-mono">
+                      <td className="px-5 py-3.5 text-stone-500 text-[12px] whitespace-nowrap font-mono">
                         {new Date(i.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                       </td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-5 py-3.5 text-right">
                         <button
                           onClick={() => setSelected(i)}
-                          className="inline-flex items-center gap-1 text-[12.5px] font-medium text-slate-400 hover:text-amber-300 transition-colors duration-200 group/btn"
+                          className="inline-flex items-center gap-1 text-[12.5px] font-medium text-stone-600 hover:text-indigo-700 transition-colors duration-150 group/btn"
                         >
                           View
                           <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover/btn:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -382,43 +363,42 @@ export default function AdminClient() {
       {/* ===== DETAIL MODAL ===== */}
       {selected && (
         <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-[fadeIn_0.2s_ease-out]"
+          className="fixed inset-0 bg-stone-900/30 backdrop-blur-[2px] flex items-center justify-center p-4 z-50 animate-[fadeIn_0.2s_ease-out]"
           onClick={() => setSelected(null)}
         >
           <div
-            className="rounded-3xl bg-[#0f0f16] border border-white/[0.08] max-w-2xl w-full max-h-[90vh] overflow-hidden animate-[fadeIn_0.25s_ease-out] shadow-2xl shadow-black/60 ring-1 ring-white/[0.04]"
+            className="rounded-2xl bg-white border border-stone-200 max-w-2xl w-full max-h-[90vh] overflow-hidden animate-[fadeIn_0.25s_ease-out] shadow-2xl shadow-stone-900/20"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="relative flex items-center justify-between p-6 border-b border-white/[0.06]">
-              <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 via-transparent to-amber-500/[0.06] pointer-events-none" />
-              <div className="relative flex items-center gap-3.5 min-w-0">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shrink-0 ring-1 ring-white/10 shadow-lg shadow-indigo-900/40">
+            <div className="flex items-center justify-between p-6 border-b border-stone-200 bg-stone-50/50">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center shrink-0 ring-1 ring-indigo-900/10">
                   <span className="text-amber-300 font-semibold text-sm">
                     {selected.fullName?.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-[15px] font-semibold text-white truncate tracking-tight">
+                  <h2 className="text-[15px] font-semibold text-stone-900 truncate tracking-tight">
                     {selected.fullName}
                   </h2>
-                  <p className="text-[12px] text-slate-500 font-mono mt-0.5">
+                  <p className="text-[12px] text-stone-500 font-mono mt-0.5">
                     {new Date(selected.createdAt).toLocaleString()}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setSelected(null)}
-                className="relative w-9 h-9 rounded-lg hover:bg-white/[0.06] flex items-center justify-center text-slate-400 hover:text-white transition-all duration-200"
+                className="w-8 h-8 rounded-lg hover:bg-stone-100 flex items-center justify-center text-stone-500 hover:text-stone-900 transition-all duration-150"
               >
-                <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto max-h-[60vh] space-y-6 custom-scroll">
+            <div className="p-6 overflow-y-auto max-h-[60vh] space-y-5">
               <Section title="Service Requested">
                 <Row label="Category" value={selected.serviceCategory || "—"} />
                 {selected.serviceCategory === "Automation Software" && (
@@ -545,21 +525,21 @@ export default function AdminClient() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2.5 p-6 border-t border-white/[0.06] bg-white/[0.01]">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2.5 p-5 border-t border-stone-200 bg-stone-50/50">
               <button
                 onClick={() => remove(selected._id)}
-                className="px-4 py-2.5 rounded-xl text-[12.5px] font-medium text-rose-300 bg-rose-500/[0.08] border border-rose-500/20 hover:bg-rose-500/[0.15] transition-all duration-300 flex items-center justify-center gap-2"
+                className="px-4 py-2.5 rounded-lg text-[12.5px] font-medium text-rose-700 bg-white border border-rose-200 hover:bg-rose-50 hover:border-rose-300 transition-all duration-200 flex items-center justify-center gap-2"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
                 Delete
               </button>
               <a
                 href={`mailto:${selected.email}?subject=Re: Your Inquiry`}
-                className="px-5 py-2.5 rounded-xl text-[12.5px] font-medium text-slate-900 bg-gradient-to-b from-amber-200 to-amber-400 hover:from-amber-100 hover:to-amber-300 shadow-lg shadow-amber-500/10 transition-all duration-300 flex items-center justify-center gap-2"
+                className="px-4 py-2.5 rounded-lg text-[12.5px] font-medium text-white bg-stone-900 hover:bg-stone-800 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
                 Reply via Email
@@ -580,42 +560,42 @@ function ServiceBadge({ category }: { category?: string }) {
     { bg: string; text: string; border: string; dot: string; label: string }
   > = {
     "Automation Software": {
-      bg: "bg-violet-500/10",
-      text: "text-violet-200",
-      border: "border-violet-500/20",
-      dot: "bg-violet-400",
+      bg: "bg-violet-50",
+      text: "text-violet-700",
+      border: "border-violet-200",
+      dot: "bg-violet-500",
       label: "Automation",
     },
     "Web Development": {
-      bg: "bg-sky-500/10",
-      text: "text-sky-200",
-      border: "border-sky-500/20",
-      dot: "bg-sky-400",
+      bg: "bg-sky-50",
+      text: "text-sky-700",
+      border: "border-sky-200",
+      dot: "bg-sky-500",
       label: "Web Dev",
     },
     "Logo Design": {
-      bg: "bg-amber-500/10",
-      text: "text-amber-200",
-      border: "border-amber-500/20",
-      dot: "bg-amber-400",
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      border: "border-amber-200",
+      dot: "bg-amber-500",
       label: "Logo",
     },
     "Digital Marketing": {
-      bg: "bg-emerald-500/10",
-      text: "text-emerald-200",
-      border: "border-emerald-500/20",
-      dot: "bg-emerald-400",
+      bg: "bg-emerald-50",
+      text: "text-emerald-700",
+      border: "border-emerald-200",
+      dot: "bg-emerald-500",
       label: "Marketing",
     },
   };
 
   const c = category && config[category] ? config[category] : null;
 
-  if (!c) return <span className="text-slate-600 text-xs">—</span>;
+  if (!c) return <span className="text-stone-300 text-xs">—</span>;
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border ${c.bg} ${c.text} ${c.border}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium border ${c.bg} ${c.text} ${c.border}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
       {c.label}
@@ -631,32 +611,29 @@ function StatCard({
 }: {
   label: string;
   value: number;
-  accent: "indigo" | "violet" | "sky" | "amber" | "emerald";
+  accent: "stone" | "violet" | "sky" | "amber" | "emerald";
   featured?: boolean;
 }) {
   const styles = {
-    indigo: { glow: "bg-indigo-500/20", text: "text-indigo-300", ring: "ring-indigo-500/20" },
-    violet: { glow: "bg-violet-500/20", text: "text-violet-300", ring: "ring-violet-500/20" },
-    sky: { glow: "bg-sky-500/20", text: "text-sky-300", ring: "ring-sky-500/20" },
-    amber: { glow: "bg-amber-500/20", text: "text-amber-300", ring: "ring-amber-500/20" },
-    emerald: { glow: "bg-emerald-500/20", text: "text-emerald-300", ring: "ring-emerald-500/20" },
+    stone: { text: "text-stone-900", bg: "bg-white" },
+    violet: { text: "text-violet-700", bg: "bg-white" },
+    sky: { text: "text-sky-700", bg: "bg-white" },
+    amber: { text: "text-amber-700", bg: "bg-white" },
+    emerald: { text: "text-emerald-700", bg: "bg-white" },
   }[accent];
 
   return (
     <div
-      className={`relative rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/[0.06] p-4 sm:p-5 transition-all duration-300 hover:bg-white/[0.05] hover:border-white/[0.12] overflow-hidden ${
+      className={`relative rounded-xl ${styles.bg} border border-stone-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.02)] p-4 transition-all duration-200 hover:border-stone-300 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] ${
         featured ? "col-span-2 lg:col-span-1" : ""
       }`}
     >
-      <div className={`absolute -top-8 -right-8 w-24 h-24 rounded-full ${styles.glow} blur-2xl opacity-50`} />
-      <div className="relative">
-        <p className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-[0.15em] mb-3">
-          {label}
-        </p>
-        <p className={`text-[26px] sm:text-[28px] font-semibold ${styles.text} tracking-tight leading-none`}>
-          {value}
-        </p>
-      </div>
+      <p className="text-[10.5px] font-semibold text-stone-500 uppercase tracking-[0.12em] mb-2.5">
+        {label}
+      </p>
+      <p className={`text-[26px] font-semibold ${styles.text} tracking-tight leading-none tabular-nums`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -664,11 +641,11 @@ function StatCard({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-[0.18em] mb-2.5 flex items-center gap-2">
-        <span className="w-1 h-1 rounded-full bg-amber-400" />
+      <h3 className="text-[10.5px] font-semibold text-stone-500 uppercase tracking-[0.14em] mb-2 flex items-center gap-2">
+        <span className="w-1 h-1 rounded-full bg-indigo-500" />
         {title}
       </h3>
-      <div className="rounded-xl bg-white/[0.02] border border-white/[0.05] divide-y divide-white/[0.04]">
+      <div className="rounded-lg bg-stone-50/70 border border-stone-200/80 divide-y divide-stone-200/70">
         {children}
       </div>
     </div>
@@ -677,11 +654,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="grid grid-cols-3 gap-3 px-4 py-3">
-      <span className="text-[12px] text-slate-500 font-medium">{label}</span>
+    <div className="grid grid-cols-3 gap-3 px-4 py-2.5">
+      <span className="text-[12px] text-stone-500 font-medium">{label}</span>
       <span
         className={`col-span-2 text-[13px] break-words whitespace-pre-wrap ${
-          highlight ? "text-violet-300 font-medium" : "text-slate-200"
+          highlight ? "text-violet-700 font-semibold" : "text-stone-800"
         }`}
       >
         {value}
@@ -692,14 +669,14 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
 
 function EmptyState() {
   return (
-    <div className="rounded-2xl bg-white/[0.02] backdrop-blur-md border border-white/[0.06] p-16 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center mx-auto mb-5">
-        <svg className="w-7 h-7 text-slate-600" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+    <div className="rounded-xl bg-white border border-stone-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.02)] p-16 text-center">
+      <div className="w-14 h-14 rounded-xl bg-stone-50 border border-stone-200 flex items-center justify-center mx-auto mb-4">
+        <svg className="w-6 h-6 text-stone-400" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
         </svg>
       </div>
-      <h3 className="text-white font-semibold text-[15px] mb-1.5">No inquiries found</h3>
-      <p className="text-[13px] text-slate-500 max-w-sm mx-auto">
+      <h3 className="text-stone-900 font-semibold text-[14.5px] mb-1">No inquiries found</h3>
+      <p className="text-[13px] text-stone-500 max-w-sm mx-auto">
         Submissions from the public form will appear here. Try adjusting your filters.
       </p>
     </div>
