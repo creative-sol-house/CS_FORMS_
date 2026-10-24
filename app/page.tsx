@@ -15,17 +15,17 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12 items-center">
 
             {/* LEFT COLUMN - Big Logo + Branding */}
-            <div className="lg:col-span-2 flex flex-col items-start space-y-5 rounded-2xl">
+            <div className="lg:col-span-2 flex flex-col items-start space-y-5 rounded-2xl ">
               {/* Big logo (contains brand name) */}
               <img
-                src="/Creative Sol House Logo.png"
+                src="/logos.png"
               alt ="Creative Sol House Logo"
-                className="w-full max-w-[280px] md:max-w-[320px] h-auto object-contain select-none rounded-3xl"
+                className="w-full max-w-[380px] md:max-w-[420px] h-auto object-contain select-none rounded-3xl "
                 draggable={false}
               />
 
               {/* Tagline under the logo */}
-              <p className="text-sm text-amber-400 font-extralight tracking-[0.15em] uppercase">
+              <p className="text-sm text-amber-400 font-extralight tracking-[0.15em] uppercase -mt-9">
                 Design · Development · Delivery
               </p>
 
