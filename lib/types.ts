@@ -8,6 +8,16 @@ export type ServiceCategory =
 
 export type RequirementType = "Commodity" | "Service";
 
+export type LeadStatus = "Interested" | "Pending" | "Call Back" | "Approved" | "Not Interested";
+export type CommunicationMode = "Call" | "WhatsApp Msg" | "WhatsApp Call" | "Text Msg" | "Email" | "Zoom Meeting" | "Onsite Meeting";
+
+export interface AuditLog {
+  action: string;
+  details?: string;
+  performedBy: string;
+  timestamp: string;
+}
+
 export interface InquiryData {
   /* Step 0 */
   serviceCategory?: ServiceCategory;
@@ -17,7 +27,7 @@ export interface InquiryData {
   email: string;
   phone: string;
   clientType: ClientType;
-  consultantName: string; // ← NEW: Mandatory field
+  consultantName: string;
   companyName?: string;
   designation?: string;
 
@@ -31,14 +41,14 @@ export interface InquiryData {
   existingWebsite?: string;
   additionalNotes?: string;
 
-  /* Step 4A - Commodity (Automation Software only) */
+  /* Step 4A - Commodity */
   commodityType?: string;
   commodityName?: string;
   commodityFeatures?: string[];
   commodityDelivery?: string;
   commodityRefs?: string;
 
-  /* Step 4B - Service (Automation Software only) */
+  /* Step 4B - Service */
   serviceType?: string;
   projectDescription?: string;
   serviceFeatures?: string[];
@@ -100,4 +110,37 @@ export interface InquiryDoc extends InquiryData {
   _id: string;
   createdAt: string;
   updatedAt: string;
+  
+  /* New CRM Features */
+  primaryAssignee?: string;
+  secondaryAssignees?: string[];
+  status: LeadStatus;
+  notes: string;
+  communicationMode?: CommunicationMode;
+  onsiteAddress?: string;
+  auditLogs: AuditLog[];
+}
+
+/* ===================== AUTH ===================== */
+
+export type Role = "admin" | "employee";
+
+export interface UserDoc {
+  _id: string;
+  username: string;
+  role: Role;
+  createdAt: string;
+  updatedAt: string;
+  passwordRequest?: boolean;
+  requestDate?: string;
+  tempPassword?: string;
+  securityQuestion?: string;
+}
+
+export interface SessionUser {
+  userId: string;
+  username: string;
+  role: Role;
+  passwordRequest?: boolean;
+  newPasswordTemp?: string;
 }

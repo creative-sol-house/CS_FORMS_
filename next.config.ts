@@ -1,4 +1,10 @@
 import type { NextConfig } from "next";
+import dns from "node:dns";
+
+// 🔥 FORCE NODE.JS TO USE GOOGLE DNS
+// This fixes the "querySrv ECONNREFUSED" error on Windows
+// by bypassing the broken default system DNS resolver.
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 const nextConfig: NextConfig = {
   /* config options here */
