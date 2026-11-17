@@ -1,5 +1,5 @@
 
-import { NextResponse } from "next/server";
+import { NextResponse, connection } from "next/server";
 import { cookies } from "next/headers";
 
 import { connectDB } from "@/lib/mongodb";
@@ -7,6 +7,7 @@ import User from "@/lib/User";
 import Inquiry from "@/lib/Inquiry";
 import { verifySession } from "@/lib/auth";
 
+// Admin authentication
 async function requireAdmin() {
   const cookieStore = await cookies();
 
@@ -23,8 +24,12 @@ async function requireAdmin() {
   return session;
 }
 
+// User Analysis API
 export async function GET() {
   try {
+    // Ensure execution happens during an actual request
+    await connection();
+
     // 1. Verify admin authentication
     const admin = await requireAdmin();
 
@@ -41,7 +46,7 @@ export async function GET() {
     // 2. Connect to MongoDB
     await connectDB();
 
-    // 3. Fetch all users (excluding passwords)
+    // 3. Fetch all users without passwords
     const users = await User.find()
       .select("-password")
       .lean();
@@ -50,14 +55,14 @@ export async function GET() {
     const results = await Promise.all(
       users.map(async (u: any) => {
 
-        // Get all leads assigned to this user
+        // Fetch all leads assigned to this user
         const currentLeads = await Inquiry.find({
           assignedTo: u.username,
         })
           .sort({ createdAt: -1 })
           .lean();
 
-        // Initialize status counts
+        // Initialize lead status counts
         const statusCounts: Record<string, number> = {
           Pending: 0,
           Interested: 0,
@@ -66,7 +71,7 @@ export async function GET() {
           "Not Interested": 0,
         };
 
-        // Count leads by status
+        // Calculate status-wise counts
         currentLeads.forEach((lead: any) => {
           if (statusCounts[lead.status] !== undefined) {
             statusCounts[lead.status]++;
@@ -96,7 +101,7 @@ export async function GET() {
       })
     );
 
-    // 5. Return successful response
+    // 5. Return analysis
     return NextResponse.json({
       success: true,
       analysis: results,
