@@ -1,73 +1,73 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/lib/User";
-import bcrypt from "bcryptjs";
+import { sendMail, passwordRequestAdminEmail } from "@/lib/mailer";
 
 export async function POST(req: Request) {
   try {
-    const { username, action, answer } = await req.json();
-    if (!username) return NextResponse.json({ success: false, error: "Username required" }, { status: 400 });
+    const { identifier } = await req.json();
+    if (!identifier) {
+      return NextResponse.json({ success: false, error: "Username or email required" }, { status: 400 });
+    }
 
     await connectDB();
-    const user = await User.findOne({ username: username.toLowerCase().trim() });
-    
+    const lookup = identifier.toLowerCase().trim();
+
+    // 1. Find the user (the developer) requesting the reset
+    const user = await User.findOne({
+      $or: [{ username: lookup }, { email: lookup }],
+    });
+
     if (!user) {
-      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "No account found." }, { status: 404 });
     }
 
-    // STEP 1: Fetch the security question
-    if (action === "get-question") {
-      if (!user.securityQuestion) {
-        return NextResponse.json({ success: false, error: "No security question set. Contact Admin." }, { status: 400 });
-      }
-      return NextResponse.json({ success: true, question: user.securityQuestion });
+    // 2. Rate Limiting (5 mins)
+    if (user.requestDate && Date.now() - new Date(user.requestDate).getTime() < 5 * 60 * 1000) {
+      const minutesLeft = Math.ceil((5 * 60 * 1000 - (Date.now() - new Date(user.requestDate).getTime())) / 60000);
+      return NextResponse.json({ success: false, error: `Please wait ${minutesLeft} minutes before trying again.` }, { status: 429 });
     }
 
-    // STEP 2: Verify the answer and send request
-    if (action === "request") {
-      if (!answer) return NextResponse.json({ success: false, error: "Answer required" }, { status: 400 });
+    // 3. Save request
+    user.passwordRequest = true;
+    user.requestDate = new Date();
+    await user.save();
 
-      // Check if the answer is correct
-      const isMatch = await bcrypt.compare(answer.toLowerCase().trim(), user.securityAnswer || "");
-      if (!isMatch) {
-         return NextResponse.json({ success: false, error: "Incorrect answer" }, { status: 401 });
+    // 4. Notify Admins
+    let emailStatus = "emails sent successfully";
+    
+    try {
+      // Find all admins
+      const admins = await User.find({ role: "admin" }).select("email username").lean();
+      
+      // Get valid emails from DB
+      let targetEmails = admins.filter((a) => a.email && a.email.trim() !== "").map(a => a.email as string);
+      
+      // FALLBACK: If no admin emails found in DB, use the SMTP_USER from .env
+      if (targetEmails.length === 0) {
+        console.warn("⚠️ No admin emails in DB. Falling back to SMTP_USER.");
+        if (!process.env.SMTP_USER) throw new Error("No fallback email available.");
+        targetEmails = [process.env.SMTP_USER];
       }
 
-      // Rate limit: 5 mins
-      if (user.requestDate && (Date.now() - new Date(user.requestDate).getTime() < 5 * 60 * 1000)) {
-         return NextResponse.json({ success: false, error: "Please wait 5 minutes before trying again." }, { status: 429 });
-      }
-
-      user.passwordRequest = true;
-      user.requestDate = new Date();
-      user.tempPassword = "";
-      await user.save();
-
-      return NextResponse.json({ success: true, message: "Request sent to Admin!" });
+      const tpl = passwordRequestAdminEmail(user.username, user.email);
+      
+      // Send to all valid admins (or the fallback)
+      await Promise.all(
+        targetEmails.map((email) => sendMail({ to: email, subject: tpl.subject, html: tpl.html }))
+      );
+      
+      console.log(`✅ Password request for ${user.username} sent to: ${targetEmails.join(", ")}`);
+    } catch (mailErr: any) {
+      console.error("❌ Admin notify email failed:", mailErr.message);
+      emailStatus = "request saved, but email notification failed. Check server logs.";
     }
 
-    // STEP 3: Reveal the password (requires answer again for security)
-    if (action === "check") {
-      if (!answer) return NextResponse.json({ success: false, error: "Answer required" }, { status: 400 });
-
-      const isMatch = await bcrypt.compare(answer.toLowerCase().trim(), user.securityAnswer || "");
-      if (!isMatch) {
-         return NextResponse.json({ success: false, error: "Incorrect answer" }, { status: 401 });
-      }
-
-      if (user.tempPassword) {
-        const revealedPass = user.tempPassword;
-        // Clear it so it can only be seen once
-        user.tempPassword = "";
-        user.passwordRequest = false;
-        await user.save();
-        return NextResponse.json({ success: true, status: "ready", password: revealedPass });
-      } else {
-        return NextResponse.json({ success: true, status: "pending" });
-      }
-    }
-
-    return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });
+    return NextResponse.json({ 
+      success: true, 
+      message: `Request sent. ${emailStatus}` 
+    });
+    
   } catch (err: any) {
     console.error("Forgot Password Error:", err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

@@ -18,11 +18,19 @@ export interface AuditLog {
   timestamp: string;
 }
 
-export interface InquiryData {
-  /* Step 0 */
-  serviceCategory?: ServiceCategory;
+export interface SubmissionLocation {
+  ip?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  latitude?: string;
+  longitude?: string;
+  userAgent?: string;
+  referer?: string;
+}
 
-  /* Step 1 - Client */
+export interface InquiryData {
+  serviceCategory?: ServiceCategory;
   fullName: string;
   email: string;
   phone: string;
@@ -30,32 +38,22 @@ export interface InquiryData {
   consultantName: string;
   companyName?: string;
   designation?: string;
-
-  /* Step 2 - only for Automation Software */
   requirementType?: RequirementType;
-
-  /* Step 3 - Project (shared) */
   projectTitle?: string;
   projectGoals?: string;
   targetAudience?: string;
   existingWebsite?: string;
   additionalNotes?: string;
-
-  /* Step 4A - Commodity */
   commodityType?: string;
   commodityName?: string;
   commodityFeatures?: string[];
   commodityDelivery?: string;
   commodityRefs?: string;
-
-  /* Step 4B - Service */
   serviceType?: string;
   projectDescription?: string;
   serviceFeatures?: string[];
   timeline?: string;
   serviceRefs?: string;
-
-  /* Step 4C - Logo Design */
   logoMessage?: string;
   likedLogos?: string;
   logoType?: string;
@@ -63,8 +61,6 @@ export interface InquiryData {
   tagline?: string;
   competitorBranding?: string;
   audienceDetail?: string;
-
-  /* Step 4D - Web Development */
   businessDescription?: string;
   usp?: string;
   businessKeywords?: string;
@@ -74,8 +70,6 @@ export interface InquiryData {
   websiteGoal?: string;
   launchDate?: string;
   additionalSuggestions?: string;
-
-  /* Step 4E - Digital Marketing */
   brandName?: string;
   natureOfBusiness?: string;
   businessActivities?: string;
@@ -98,49 +92,55 @@ export interface InquiryData {
   communityEngagements?: string;
   serpPositioning?: string;
   competitorNamesUrls?: string;
-
-  /* Step 5 - Consent */
   preferredContactMethod?: string;
   preferredContactTime?: string;
   agreeToTerms: boolean;
   subscribeUpdates?: boolean;
 }
 
+
 export interface InquiryDoc extends InquiryData {
   _id: string;
   createdAt: string;
   updatedAt: string;
-  
-  /* New CRM Features */
-  primaryAssignee?: string;
-  secondaryAssignees?: string[];
+  assignedTo?: string;
   status: LeadStatus;
   notes: string;
+  messages: ChatMessage[];        // ← was: Array<{ text; sender; timestamp; readBy }>
   communicationMode?: CommunicationMode;
   onsiteAddress?: string;
   auditLogs: AuditLog[];
+  submissionLocation?: SubmissionLocation;
 }
-
-/* ===================== AUTH ===================== */
-
-export type Role = "admin" | "employee";
+export type Role = "admin" | "business_developer";
 
 export interface UserDoc {
   _id: string;
   username: string;
+  email: string;
+  phone?: string;
+  profilePicture?: string;
   role: Role;
   createdAt: string;
   updatedAt: string;
   passwordRequest?: boolean;
   requestDate?: string;
-  tempPassword?: string;
-  securityQuestion?: string;
 }
 
 export interface SessionUser {
   userId: string;
   username: string;
+  email: string;
   role: Role;
+  profilePicture?: string; // <-- Add this
   passwordRequest?: boolean;
-  newPasswordTemp?: string;
+}
+
+export interface ChatMessage {
+  _id?: string;
+  text: string;
+  sender: string;
+  senderRole?: "admin" | "business_developer";
+  timestamp: string;
+  readBy: string[];
 }

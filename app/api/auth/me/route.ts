@@ -13,24 +13,22 @@ export async function GET() {
   if (!session) return NextResponse.json({ success: false }, { status: 401 });
 
   await connectDB();
-  
-  // Fetch user, excluding sensitive hash fields
-  const dbUser = await User.findById(session.userId).select("-password -securityAnswer").lean();
-  
+  const dbUser = await User.findById(session.userId).select("-password").lean();
+
   if (!dbUser) {
     return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
   }
 
-  // Map the database fields to what the frontend expects
-  return NextResponse.json({ 
-    success: true, 
-    user: { 
+  return NextResponse.json({
+    success: true,
+    user: {
       userId: dbUser._id.toString(),
       username: dbUser.username,
+      email: dbUser.email,
+      phone: dbUser.phone || "",
+      profilePicture: dbUser.profilePicture || "",
       role: dbUser.role,
-      passwordRequest: dbUser.passwordRequest,
-      // Here we map tempPassword to newPasswordTemp for the frontend
-      newPasswordTemp: dbUser.tempPassword 
-    } 
+      passwordRequest: dbUser.passwordRequest || false,
+    },
   });
 }

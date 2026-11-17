@@ -3,11 +3,12 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error("JWT_SECRET missing in .env.local");
 
-export type Role = "admin" | "employee";
+export type Role = "admin" | "business_developer";
 
 export interface SessionPayload {
-  userId: string; 
+  userId: string;
   username: string;
+  email: string;
   role: Role;
 }
 

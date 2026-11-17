@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/lib/User";
 import { verifySession } from "@/lib/auth";
 import bcrypt from "bcryptjs";
+import { sendMail, welcomeEmail, passwordChangedEmail } from "@/lib/mailer";
 
 async function requireAdmin() {
   const cookieStore = await cookies();
@@ -19,20 +20,21 @@ export async function GET() {
   try {
     const admin = await requireAdmin();
     if (!admin) return NextResponse.json({ success: false, error: "Admin only" }, { status: 403 });
-    
+
     await connectDB();
-    const users = await User.find().select("-password -securityAnswer").sort({ createdAt: -1 }).lean();
-    
+    const users = await User.find().select("-password").sort({ createdAt: -1 }).lean();
+
     const formattedUsers = users.map((u: any) => ({
       _id: u._id.toString(),
       username: u.username,
+      email: u.email,
+      phone: u.phone || "",
+      profilePicture: u.profilePicture || "",
       role: u.role,
       createdAt: u.createdAt,
       updatedAt: u.updatedAt,
       passwordRequest: u.passwordRequest || false,
       requestDate: u.requestDate,
-      tempPassword: u.tempPassword || "",
-      securityQuestion: u.securityQuestion || "",
     }));
 
     return NextResponse.json({ success: true, users: formattedUsers });
@@ -48,28 +50,51 @@ export async function POST(req: Request) {
     if (!admin) return NextResponse.json({ success: false, error: "Admin only" }, { status: 403 });
 
     await connectDB();
-    const { username, password, role, securityQuestion, securityAnswer } = await req.json();
+    const { username, password, role, email, phone } = await req.json();
 
-    if (!username || !password) return NextResponse.json({ success: false, error: "Username and password required" }, { status: 400 });
-    if (password.length < 6) return NextResponse.json({ success: false, error: "Password must be at least 6 characters" }, { status: 400 });
-    if (!securityQuestion || !securityAnswer) return NextResponse.json({ success: false, error: "Security Question and Answer are required" }, { status: 400 });
-    
-    const validRole = role === "admin" ? "admin" : "employee";
-    const existing = await User.findOne({ username: username.toLowerCase().trim() });
-    if (existing) return NextResponse.json({ success: false, error: "Username already exists" }, { status: 409 });
+    if (!username || !password || !email) {
+      return NextResponse.json({ success: false, error: "Username, email and password required" }, { status: 400 });
+    }
+    if (password.length < 6) {
+      return NextResponse.json({ success: false, error: "Password must be at least 6 characters" }, { status: 400 });
+    }
 
-    // User.create() DOES trigger the pre-save hook, so password will hash automatically
-    const user = await User.create({ 
-      username: username.toLowerCase().trim(), 
-      password, 
+    const validRole = role === "admin" ? "admin" : "business_developer";
+    const lowerUser = username.toLowerCase().trim();
+    const lowerEmail = email.toLowerCase().trim();
+
+    const existingUser = await User.findOne({ username: lowerUser });
+    if (existingUser) return NextResponse.json({ success: false, error: "Username already exists" }, { status: 409 });
+
+    const existingEmail = await User.findOne({ email: lowerEmail });
+    if (existingEmail) return NextResponse.json({ success: false, error: "Email already in use" }, { status: 409 });
+
+    const user = await User.create({
+      username: lowerUser,
+      email: lowerEmail,
+      phone: phone || "",
+      password,
       role: validRole,
-      securityQuestion,
-      securityAnswer
     });
+
+    // Fire welcome email (non-blocking failure)
+    try {
+      const tpl = welcomeEmail(user.username, password);
+      await sendMail({ to: user.email, subject: tpl.subject, html: tpl.html });
+    } catch (mailErr) {
+      console.error("Welcome email failed:", mailErr);
+    }
 
     return NextResponse.json({
       success: true,
-      user: { _id: user._id.toString(), username: user.username, role: user.role, createdAt: user.createdAt },
+      user: {
+        _id: user._id.toString(),
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        createdAt: user.createdAt,
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
@@ -83,69 +108,70 @@ export async function PATCH(req: Request) {
     if (!admin) return NextResponse.json({ success: false, error: "Admin only" }, { status: 403 });
 
     await connectDB();
-    const { userId, newPassword, clearRequest, newUsername, newRole, newQuestion, newAnswer } = await req.json();
+    const {
+      userId,
+      newPassword,
+      clearRequest,
+      newUsername,
+      newRole,
+      newEmail,
+      newPhone,
+    } = await req.json();
 
     if (!userId) return NextResponse.json({ success: false, error: "User ID required" }, { status: 400 });
 
     const user = await User.findById(userId);
     if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
 
-    // 🔴 FIX: Manually hash the password since $set bypasses pre-save hooks
+    const updates: any = {};
+    let plainPasswordForEmail: string | null = null;
+
     if (newPassword) {
-      if (newPassword.length < 6) return NextResponse.json({ success: false, error: "Password too short" }, { status: 400 });
-      
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(newPassword, salt);
-      
-      user.password = hashedPassword;
-      user.tempPassword = newPassword; // Save plain text temporarily for employee to see
+      if (newPassword.length < 6) {
+        return NextResponse.json({ success: false, error: "Password too short" }, { status: 400 });
+      }
+      const hashed = await bcrypt.hash(newPassword, 10);
+      updates.password = hashed;
+      updates.tempPassword = newPassword; // for reference; dashboard reveal removed
+      plainPasswordForEmail = newPassword;
     }
 
     if (clearRequest) {
-      user.passwordRequest = false;
-      user.tempPassword = "";
+      updates.passwordRequest = false;
+      updates.tempPassword = "";
     }
 
     if (newUsername) {
       const formatted = newUsername.toLowerCase().trim();
       const existing = await User.findOne({ username: formatted, _id: { $ne: userId } });
       if (existing) return NextResponse.json({ success: false, error: "Username already taken" }, { status: 409 });
-      user.username = formatted;
+      updates.username = formatted;
     }
 
-    if (newRole) {
-      user.role = newRole === "admin" ? "admin" : "employee";
+    if (newEmail) {
+      const formatted = newEmail.toLowerCase().trim();
+      const existing = await User.findOne({ email: formatted, _id: { $ne: userId } });
+      if (existing) return NextResponse.json({ success: false, error: "Email already taken" }, { status: 409 });
+      updates.email = formatted;
     }
 
-    if (typeof newQuestion === "string") {
-      user.securityQuestion = newQuestion;
-    }
+    if (newPhone !== undefined) updates.phone = newPhone;
 
-    // Manually hash the answer too, since securityAnswer is stored hashed
-    if (typeof newAnswer === "string" && newAnswer.trim() !== "") {
-      const hashedAnswer = await bcrypt.hash(newAnswer.toLowerCase().trim(), 10);
-      user.securityAnswer = hashedAnswer;
-    }
-
-    // user.save() is now safe here because we manually hashed the password above
-    // The pre-save hook will skip hashing since we're not using .save() for the password change... 
-    // Actually, because we're using user.save(), the hook WILL try to hash again.
-    // So we use .save() but mark the password as not modified to prevent double hashing.
-    
-    // Alternative: Use findByIdAndUpdate with the already hashed value
-    const updates: any = {};
-    if (newPassword) updates.password = user.password;
-    if (newPassword) updates.tempPassword = newPassword;
-    if (clearRequest) { updates.passwordRequest = false; updates.tempPassword = ""; }
-    if (newUsername) updates.username = user.username;
-    if (newRole) updates.role = user.role;
-    if (newQuestion) updates.securityQuestion = newQuestion;
-    if (user.securityAnswer) updates.securityAnswer = user.securityAnswer;
+    if (newRole) updates.role = newRole === "admin" ? "admin" : "business_developer";
 
     await User.findByIdAndUpdate(userId, { $set: updates }, { new: true });
 
+    // Send email when password was set
+    if (plainPasswordForEmail) {
+      try {
+        const tpl = passwordChangedEmail(user.username, plainPasswordForEmail);
+        await sendMail({ to: updates.email || user.email, subject: tpl.subject, html: tpl.html });
+      } catch (mailErr) {
+        console.error("Password-changed email failed:", mailErr);
+      }
+    }
+
     return NextResponse.json({ success: true, message: "User updated successfully" });
-    
   } catch (err: any) {
     console.error("PATCH Error:", err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
@@ -162,7 +188,9 @@ export async function DELETE(req: Request) {
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ success: false, error: "No ID" }, { status: 400 });
 
-    if (id === admin.userId) return NextResponse.json({ success: false, error: "You cannot delete your own account" }, { status: 400 });
+    if (id === admin.userId) {
+      return NextResponse.json({ success: false, error: "You cannot delete your own account" }, { status: 400 });
+    }
 
     await connectDB();
     await User.findByIdAndDelete(id);

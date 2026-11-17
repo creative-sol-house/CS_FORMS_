@@ -10,12 +10,18 @@ export async function POST(req: Request) {
 
     if (!username || !password) {
       return NextResponse.json(
-        { success: false, error: "Username and password required" },
+        { success: false, error: "Username/Email and password required" },
         { status: 400 }
       );
     }
 
-    const user = await User.findOne({ username: username.toLowerCase().trim() });
+    const identifier = username.toLowerCase().trim();
+
+    // Login by username OR email
+    const user = await User.findOne({
+      $or: [{ username: identifier }, { email: identifier }],
+    });
+
     if (!user) {
       return NextResponse.json(
         { success: false, error: "Invalid credentials" },
@@ -34,6 +40,7 @@ export async function POST(req: Request) {
     const token = signSession({
       userId: user._id.toString(),
       username: user.username,
+      email: user.email,
       role: user.role,
     });
 
@@ -42,6 +49,7 @@ export async function POST(req: Request) {
       user: {
         _id: user._id.toString(),
         username: user.username,
+        email: user.email,
         role: user.role,
       },
     });
@@ -51,14 +59,11 @@ export async function POST(req: Request) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7,
     });
 
     return res;
   } catch (err: any) {
-    return NextResponse.json(
-      { success: false, error: err.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
