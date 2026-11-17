@@ -1,5 +1,5 @@
 
-import { NextResponse, connection } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 import { connectDB } from "@/lib/mongodb";
@@ -7,62 +7,58 @@ import User from "@/lib/User";
 import Inquiry from "@/lib/Inquiry";
 import { verifySession } from "@/lib/auth";
 
-// Admin authentication
-async function requireAdmin() {
+export async function GET() {
+  // IMPORTANT:
+  // Keep cookies() outside the try/catch.
+  // Next.js needs to handle its own prerendering signal.
   const cookieStore = await cookies();
-
   const token = cookieStore.get("session")?.value;
 
-  if (!token) return null;
-
-  const session = verifySession(token);
-
-  if (!session || session.role !== "admin") {
-    return null;
+  // 1. Check authentication
+  if (!token) {
+    return NextResponse.json(
+      { success: false, error: "Admin only" },
+      { status: 403 }
+    );
   }
 
-  return session;
-}
+  // 2. Verify admin session
+  let session;
 
-// User Analysis API
-export async function GET() {
   try {
-    // Ensure execution happens during an actual request
-    await connection();
+    session = verifySession(token);
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Invalid session" },
+      { status: 403 }
+    );
+  }
 
-    // 1. Verify admin authentication
-    const admin = await requireAdmin();
+  if (!session || session.role !== "admin") {
+    return NextResponse.json(
+      { success: false, error: "Admin only" },
+      { status: 403 }
+    );
+  }
 
-    if (!admin) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Admin only",
-        },
-        { status: 403 }
-      );
-    }
-
-    // 2. Connect to MongoDB
+  // 3. Fetch user analysis
+  try {
     await connectDB();
 
-    // 3. Fetch all users without passwords
     const users = await User.find()
       .select("-password")
       .lean();
 
-    // 4. Generate analysis for each user
     const results = await Promise.all(
       users.map(async (u: any) => {
-
-        // Fetch all leads assigned to this user
+        // Fetch assigned leads
         const currentLeads = await Inquiry.find({
           assignedTo: u.username,
         })
           .sort({ createdAt: -1 })
           .lean();
 
-        // Initialize lead status counts
+        // Initialize status counts
         const statusCounts: Record<string, number> = {
           Pending: 0,
           Interested: 0,
@@ -71,7 +67,7 @@ export async function GET() {
           "Not Interested": 0,
         };
 
-        // Calculate status-wise counts
+        // Count leads by status
         currentLeads.forEach((lead: any) => {
           if (statusCounts[lead.status] !== undefined) {
             statusCounts[lead.status]++;
@@ -87,7 +83,6 @@ export async function GET() {
             ? Math.round((approved / total) * 100)
             : 0;
 
-        // Return user analysis
         return {
           _id: u._id.toString(),
           username: u.username,
@@ -101,7 +96,6 @@ export async function GET() {
       })
     );
 
-    // 5. Return analysis
     return NextResponse.json({
       success: true,
       analysis: results,
