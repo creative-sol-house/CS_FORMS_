@@ -1,5 +1,7 @@
+
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+export const dynamic = "force-dynamic";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/lib/User";
 import Inquiry from "@/lib/Inquiry";
