@@ -23,7 +23,7 @@ export async function GET() {
     success: true,
     user: {
       userId: dbUser._id.toString(),
-      username: dbUser.username,
+      name: dbUser.name,
       email: dbUser.email,
       phone: dbUser.phone || "",
       profilePicture: dbUser.profilePicture || "",

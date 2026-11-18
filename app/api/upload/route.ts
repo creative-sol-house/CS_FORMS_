@@ -27,9 +27,6 @@ export async function POST(req: Request) {
     
     if (!file) return NextResponse.json({ success: false, error: "No file provided" }, { status: 400 });
 
-    // Security: Only admins can update other users' pictures
-    const userIdToUpdate = session.role === "admin" && targetUserId ? targetUserId : session.userId;
-
     // 3. Upload to Cloudinary
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -46,9 +43,15 @@ export async function POST(req: Request) {
 
     const imageUrl = (uploadResult as any).secure_url;
 
-    // 4. Save URL to Database
-    await connectDB();
-    await User.findByIdAndUpdate(userIdToUpdate, { $set: { profilePicture: imageUrl } });
+    // 4. ONLY save to DB if targetUserId is provided (Edit mode)
+    // If creating a new user, we just return the URL to the frontend.
+    if (targetUserId) {
+      // Security: Only admins can update other users' pictures
+      const userIdToUpdate = session.role === "admin" ? targetUserId : session.userId;
+      
+      await connectDB();
+      await User.findByIdAndUpdate(userIdToUpdate, { $set: { profilePicture: imageUrl } });
+    }
 
     return NextResponse.json({ success: true, imageUrl });
   } catch (err: any) {

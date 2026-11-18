@@ -93,7 +93,7 @@ export default function UserAnalysisPanel({
             <option value="" disabled>Select team member…</option>
             {analysis.map((u) => (
               <option key={u._id} value={u._id}>
-                {u.username} ({u.leads.length} leads)
+                {u.name} ({u.leads.length} leads)
               </option>
             ))}
           </select>

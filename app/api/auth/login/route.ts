@@ -6,21 +6,19 @@ import { signSession } from "@/lib/auth";
 export async function POST(req: Request) {
   try {
     await connectDB();
-    const { username, password } = await req.json();
+    const { email, password } = await req.json();
 
-    if (!username || !password) {
+    if (!email || !password) {
       return NextResponse.json(
-        { success: false, error: "Username/Email and password required" },
+        { success: false, error: "Email and password are required" },
         { status: 400 }
       );
     }
 
-    const identifier = username.toLowerCase().trim();
+    const normalizedEmail = email.toLowerCase().trim();
 
-    // Login by username OR email
-    const user = await User.findOne({
-      $or: [{ username: identifier }, { email: identifier }],
-    });
+    // Login strictly by email
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return NextResponse.json(
@@ -39,7 +37,7 @@ export async function POST(req: Request) {
 
     const token = signSession({
       userId: user._id.toString(),
-      username: user.username,
+      name: user.name,
       email: user.email,
       role: user.role,
     });
@@ -48,7 +46,7 @@ export async function POST(req: Request) {
       success: true,
       user: {
         _id: user._id.toString(),
-        username: user.username,
+        name: user.name,
         email: user.email,
         role: user.role,
       },

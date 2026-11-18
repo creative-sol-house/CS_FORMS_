@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
@@ -51,9 +50,9 @@ export async function GET() {
 
     const results = await Promise.all(
       users.map(async (u: any) => {
-        // Fetch assigned leads
+        // Fetch assigned leads by user name
         const currentLeads = await Inquiry.find({
-          assignedTo: u.username,
+          assignedTo: u.name,
         })
           .sort({ createdAt: -1 })
           .lean();
@@ -85,7 +84,7 @@ export async function GET() {
 
         return {
           _id: u._id.toString(),
-          username: u.username,
+          name: u.name,
           email: u.email,
           phone: u.phone || "",
           role: u.role,

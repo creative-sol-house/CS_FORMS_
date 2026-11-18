@@ -30,7 +30,7 @@ export async function POST() {
     user.passwordRequest = true;
     await user.save();
 
-    console.log(`✅ [DB SAVED] Password request set to true for: ${user.username}`);
+    console.log(`✅ [DB SAVED] Password request set to true for: ${user.name}`);
 
     // Return a JSON body with a non-zero content-length
     return NextResponse.json({ 

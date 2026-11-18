@@ -1,0 +1,773 @@
+"use client";
+import { useMemo, useRef, useState, useEffect } from "react";
+import {
+  InquiryData,
+  ServiceCategory,
+  ClientType,
+  RequirementType,
+  CommunicationMode,
+} from "@/lib/types";
+
+const SERVICES: { value: ServiceCategory; label: string; desc: string }[] = [
+  { value: "Automation Software", label: "Automation Software", desc: "Bots, integrations, workflow automation" },
+  { value: "Web Development",     label: "Web Development",     desc: "Websites, web apps, e-commerce" },
+  { value: "Logo Design",         label: "Logo Design",         desc: "Branding, logo, visual identity" },
+  { value: "Digital Marketing",   label: "Digital Marketing",   desc: "SEO, ads, social, content" },
+];
+
+const CONTACT_METHODS: CommunicationMode[] = [
+  "Call", "WhatsApp Msg", "WhatsApp Call", "Text Msg", "Email", "Zoom Meeting", "Onsite Meeting",
+];
+
+interface Props {
+  consultantName: string;
+  consultantId: string;
+  lockedService?: ServiceCategory;
+  /** If provided → edit mode */
+  leadId?: string;
+  initialData?: Partial<InquiryData>;
+  onClose: () => void;
+  onSaved: (lead: any) => void;
+}
+
+type Step = 0 | 1 | 2 | 3;
+
+export default function LeadForm({
+  consultantName,
+  consultantId,
+  lockedService,
+  leadId,
+  initialData,
+  onClose,
+  onSaved,
+}: Props) {
+  const isEdit = Boolean(leadId);
+  const startingService = lockedService ?? initialData?.serviceCategory;
+
+  const [serviceCategory, setServiceCategory] = useState<ServiceCategory | undefined>(startingService);
+  const [step, setStep] = useState<Step>(startingService ? 1 : 0);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  const [data, setData] = useState<Partial<InquiryData>>(() => ({
+    clientType: "Individual",
+    consultantName,
+    agreeToTerms: true,
+    subscribeUpdates: false,
+    ...initialData,
+  }));
+
+  const set = <K extends keyof InquiryData>(k: K, v: InquiryData[K]) =>
+    setData((d) => ({ ...d, [k]: v }));
+
+  const setArray = (k: "commodityFeatures" | "serviceFeatures", raw: string) =>
+    setData((d) => ({
+      ...d,
+      [k]: raw.split(",").map((s) => s.trim()).filter(Boolean),
+    }));
+
+  const stepErrors = useMemo(() => {
+    const e: Record<string, string> = {};
+    if (step >= 1) {
+      if (!data.fullName?.trim()) e.fullName = "Required";
+      if (!data.email?.trim()) e.email = "Required";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "Invalid email";
+      if (!data.phone?.trim()) e.phone = "Required";
+      else if (!/^[+\d][\d\s\-()]{5,}$/.test(data.phone)) e.phone = "Invalid phone";
+    }
+    return e;
+  }, [data, step]);
+  const canAdvance = Object.keys(stepErrors).length === 0;
+
+  const submit = async () => {
+    setSaving(true);
+    setErr("");
+    try {
+      const body = {
+        ...data,
+        serviceCategory,
+        consultantName: isEdit ? data.consultantName || consultantName : consultantName,
+        consultantId:  isEdit ? data.consultantId  || consultantId  : consultantId,
+        createdBy:   data.createdBy  || consultantName,
+        createdById: data.createdById || consultantId,
+      };
+
+      const res = isEdit
+        ? await fetch("/api/admin/inquiries", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: leadId, updates: body }),
+          })
+        : await fetch("/api/admin/inquiries", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || "Failed to save lead");
+      onSaved(json.inquiry);
+      onClose();
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const progress = useMemo(() => {
+    const total = startingService ? 4 : 5;
+    const done = step + 1 + (startingService ? 0 : 1);
+    return Math.round((done / total) * 100);
+  }, [step, startingService]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm" onClick={onClose} />
+
+      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] ring-1 ring-stone-900/5">
+        {/* Header */}
+        <div className="relative bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-600 px-6 pt-6 pb-5 text-white shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-indigo-200">
+                {isEdit ? "Edit Lead" : "New Lead"}
+              </p>
+              <h2 className="text-xl sm:text-2xl font-semibold mt-0.5">
+                {step === 0 ? "What service is this for?" : serviceCategory ?? "Create Lead"}
+              </h2>
+              <p className="text-sm text-indigo-100 mt-1">
+                {step === 0 ? "Pick a category to begin." : `Consultant: ${data.consultantName || consultantName}`}
+              </p>
+            </div>
+            <button onClick={onClose} aria-label="Close" className="rounded-full p-2 hover:bg-white/15 transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="mt-5 h-1.5 bg-white/20 rounded-full overflow-hidden">
+            <div className="h-full bg-white rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          {step === 0 && (
+            <StepService value={serviceCategory} onChange={(s) => { setServiceCategory(s); setStep(1); }} />
+          )}
+          {step === 1 && <StepClient data={data} set={set} errors={stepErrors} />}
+          {step === 2 && serviceCategory && (
+            <StepServiceDetails service={serviceCategory} data={data} set={set} setArray={setArray} />
+          )}
+          {step === 3 && (
+            <StepReview data={data} service={serviceCategory} consultantName={data.consultantName || consultantName} set={set} />
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 border-t border-stone-200 bg-stone-50 px-6 py-4">
+          {err && (
+            <div className="mb-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{err}</div>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <button
+              onClick={() => { if (step === 0) onClose(); else setStep((s) => (s - 1) as Step); }}
+              className="px-4 py-2 text-sm font-semibold text-stone-700 hover:text-stone-900 rounded-lg hover:bg-stone-200/60 transition-colors"
+            >
+              {step === 0 ? "Cancel" : "← Back"}
+            </button>
+
+            <div className="flex items-center gap-2">
+              {step < 3 && (
+                <button
+                  onClick={() => setStep((s) => (s + 1) as Step)}
+                  disabled={step === 1 && !canAdvance}
+                  className="px-5 py-2.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Continue →
+                </button>
+              )}
+              {step === 3 && (
+                <button
+                  onClick={submit}
+                  disabled={saving}
+                  className="px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors flex items-center gap-2"
+                >
+                  {saving && <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+                  {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Lead"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── Step 0 ─────────────── */
+function StepService({ value, onChange }: { value?: ServiceCategory; onChange: (s: ServiceCategory) => void }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {SERVICES.map((s) => {
+        const active = value === s.value;
+        return (
+          <button
+            key={s.value}
+            onClick={() => onChange(s.value)}
+            className={`group relative text-left p-5 rounded-xl border-2 transition-all duration-200 ${
+              active ? "border-indigo-600 bg-indigo-50/60 shadow-sm" : "border-stone-200 hover:border-indigo-400 hover:bg-indigo-50/30"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-stone-900 text-sm">{s.label}</p>
+                <p className="text-xs text-stone-500 mt-1 leading-relaxed">{s.desc}</p>
+              </div>
+              <span className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${active ? "border-indigo-600 bg-indigo-600" : "border-stone-300 group-hover:border-indigo-400"}`}>
+                {active && (
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </span>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─────────────── Step 1 ─────────────── */
+function StepClient({
+  data, set, errors,
+}: {
+  data: Partial<InquiryData>;
+  set: <K extends keyof InquiryData>(k: K, v: InquiryData[K]) => void;
+  errors: Record<string, string>;
+}) {
+  return (
+    <div className="space-y-5">
+      <SectionHeader title="Client information" subtitle="Basic details so we can reach them." />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Full name" required error={errors.fullName}>
+          <TextInput value={data.fullName || ""} onChange={(v) => set("fullName", v)} placeholder="Jane Doe" autoFocus />
+        </Field>
+        <Field label="Client type" required>
+          <Select
+            value={data.clientType || "Individual"}
+            onChange={(v) => set("clientType", v as ClientType)}
+            options={[{ value: "Individual", label: "Individual" }, { value: "Business", label: "Business" }]}
+          />
+        </Field>
+        <Field label="Email" required error={errors.email}>
+          <TextInput type="email" value={data.email || ""} onChange={(v) => set("email", v)} placeholder="jane@company.com" />
+        </Field>
+        <Field label="Phone" required error={errors.phone}>
+          <TextInput type="tel" value={data.phone || ""} onChange={(v) => set("phone", v)} placeholder="+1 555 123 4567" />
+        </Field>
+        <Field label="Company name">
+          <TextInput value={data.companyName || ""} onChange={(v) => set("companyName", v)} placeholder="Acme Inc." />
+        </Field>
+        <Field label="Designation">
+          <TextInput value={data.designation || ""} onChange={(v) => set("designation", v)} placeholder="Marketing Head" />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── Step 2 ─────────────── */
+function StepServiceDetails({
+  service, data, set, setArray,
+}: {
+  service: ServiceCategory;
+  data: Partial<InquiryData>;
+  set: <K extends keyof InquiryData>(k: K, v: InquiryData[K]) => void;
+  setArray: (k: "commodityFeatures" | "serviceFeatures", raw: string) => void;
+}) {
+  if (service === "Automation Software") return <AutomationFields data={data} set={set} setArray={setArray} />;
+  if (service === "Web Development")     return <WebDevFields data={data} set={set} />;
+  if (service === "Logo Design")         return <LogoFields data={data} set={set} />;
+  if (service === "Digital Marketing")   return <MarketingFields data={data} set={set} />;
+  return null;
+}
+
+function AutomationFields({ data, set, setArray }: any) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionHeader title="Project overview" subtitle="What's the requirement?" />
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Requirement type">
+            <Select
+              value={data.requirementType || ""}
+              onChange={(v) => set("requirementType", (v || undefined) as RequirementType)}
+              options={[
+                { value: "", label: "Select…" },
+                { value: "Commodity", label: "Commodity" },
+                { value: "Service", label: "Service" },
+              ]}
+            />
+          </Field>
+          <Field label="Project title">
+            <TextInput value={data.projectTitle || ""} onChange={(v) => set("projectTitle", v)} placeholder="e.g. Invoice automation bot" />
+          </Field>
+        </div>
+        <div className="mt-4 space-y-4">
+          <Field label="Project goals">
+            <TextArea value={data.projectGoals || ""} onChange={(v) => set("projectGoals", v)} placeholder="What should this automation achieve?" />
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Target audience">
+              <TextInput value={data.targetAudience || ""} onChange={(v) => set("targetAudience", v)} />
+            </Field>
+            <Field label="Existing website">
+              <TextInput value={data.existingWebsite || ""} onChange={(v) => set("existingWebsite", v)} placeholder="https://…" />
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      {data.requirementType === "Commodity" && (
+        <div>
+          <SectionHeader title="Commodity details" />
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Commodity type">
+              <TextInput value={data.commodityType || ""} onChange={(v) => set("commodityType", v)} />
+            </Field>
+            <Field label="Commodity name">
+              <TextInput value={data.commodityName || ""} onChange={(v) => set("commodityName", v)} />
+            </Field>
+          </div>
+          <div className="mt-4 space-y-4">
+            <Field label="Features (comma separated)">
+              <TextInput value={(data.commodityFeatures || []).join(", ")} onChange={(v) => setArray("commodityFeatures", v)} placeholder="Feature A, Feature B, Feature C" />
+            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Delivery terms">
+                <TextInput value={data.commodityDelivery || ""} onChange={(v) => set("commodityDelivery", v)} />
+              </Field>
+              <Field label="References">
+                <TextInput value={data.commodityRefs || ""} onChange={(v) => set("commodityRefs", v)} />
+              </Field>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {data.requirementType === "Service" && (
+        <div>
+          <SectionHeader title="Service details" />
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Service type">
+              <TextInput value={data.serviceType || ""} onChange={(v) => set("serviceType", v)} />
+            </Field>
+            <Field label="Timeline">
+              <TextInput value={data.timeline || ""} onChange={(v) => set("timeline", v)} placeholder="e.g. 4 weeks" />
+            </Field>
+          </div>
+          <div className="mt-4 space-y-4">
+            <Field label="Project description">
+              <TextArea value={data.projectDescription || ""} onChange={(v) => set("projectDescription", v)} />
+            </Field>
+            <Field label="Service features (comma separated)">
+              <TextInput value={(data.serviceFeatures || []).join(", ")} onChange={(v) => setArray("serviceFeatures", v)} />
+            </Field>
+            <Field label="References">
+              <TextInput value={data.serviceRefs || ""} onChange={(v) => set("serviceRefs", v)} />
+            </Field>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WebDevFields({ data, set }: any) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionHeader title="Project" />
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Project title">
+            <TextInput value={data.projectTitle || ""} onChange={(v) => set("projectTitle", v)} />
+          </Field>
+          <Field label="Existing website">
+            <TextInput value={data.existingWebsite || ""} onChange={(v) => set("existingWebsite", v)} placeholder="https://…" />
+          </Field>
+        </div>
+        <div className="mt-4 space-y-4">
+          <Field label="Project goals">
+            <TextArea value={data.projectGoals || ""} onChange={(v) => set("projectGoals", v)} />
+          </Field>
+          <Field label="Target audience">
+            <TextInput value={data.targetAudience || ""} onChange={(v) => set("targetAudience", v)} />
+          </Field>
+        </div>
+      </div>
+      <div>
+        <SectionHeader title="Website details" />
+        <div className="mt-4 space-y-4">
+          <Field label="Pages needed">
+            <TextInput value={data.pagesNeeded || ""} onChange={(v) => set("pagesNeeded", v)} placeholder="Home, About, Services, Contact…" />
+          </Field>
+          <Field label="Features needed">
+            <TextInput value={data.featuresNeeded || ""} onChange={(v) => set("featuresNeeded", v)} placeholder="CMS, e-commerce, blog…" />
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Website goal">
+              <TextInput value={data.websiteGoal || ""} onChange={(v) => set("websiteGoal", v)} />
+            </Field>
+            <Field label="Launch date">
+              <DateInput value={data.launchDate || ""} onChange={(v) => set("launchDate", v)} />
+            </Field>
+          </div>
+          <Field label="Reference websites">
+            <TextInput value={data.referenceWebsites || ""} onChange={(v) => set("referenceWebsites", v)} />
+          </Field>
+          <Field label="Additional suggestions">
+            <TextArea value={data.additionalSuggestions || ""} onChange={(v) => set("additionalSuggestions", v)} />
+          </Field>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LogoFields({ data, set }: any) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionHeader title="Brand" />
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Brand name"><TextInput value={data.brandName || ""} onChange={(v) => set("brandName", v)} /></Field>
+          <Field label="Tagline"><TextInput value={data.tagline || ""} onChange={(v) => set("tagline", v)} /></Field>
+          <Field label="Nature of business"><TextInput value={data.natureOfBusiness || ""} onChange={(v) => set("natureOfBusiness", v)} /></Field>
+          <Field label="Logo type"><TextInput value={data.logoType || ""} onChange={(v) => set("logoType", v)} placeholder="Wordmark, icon, combination…" /></Field>
+        </div>
+        <div className="mt-4 space-y-4">
+          <Field label="Business description"><TextArea value={data.businessDescription || ""} onChange={(v) => set("businessDescription", v)} /></Field>
+          <Field label="USP"><TextInput value={data.usp || ""} onChange={(v) => set("usp", v)} placeholder="What makes them unique?" /></Field>
+        </div>
+      </div>
+      <div>
+        <SectionHeader title="Design preferences" />
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Color preferences"><TextInput value={data.colorPreferences || ""} onChange={(v) => set("colorPreferences", v)} placeholder="Blue, gold, minimal…" /></Field>
+          <Field label="Liked logos"><TextInput value={data.likedLogos || ""} onChange={(v) => set("likedLogos", v)} /></Field>
+        </div>
+        <div className="mt-4 space-y-4">
+          <Field label="Competitor branding"><TextInput value={data.competitorBranding || ""} onChange={(v) => set("competitorBranding", v)} /></Field>
+          <Field label="Audience detail"><TextInput value={data.audienceDetail || ""} onChange={(v) => set("audienceDetail", v)} /></Field>
+          <Field label="Logo message"><TextArea value={data.logoMessage || ""} onChange={(v) => set("logoMessage", v)} /></Field>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MarketingFields({ data, set }: any) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionHeader title="Business" />
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Brand name"><TextInput value={data.brandName || ""} onChange={(v) => set("brandName", v)} /></Field>
+          <Field label="Nature of business"><TextInput value={data.natureOfBusiness || ""} onChange={(v) => set("natureOfBusiness", v)} /></Field>
+        </div>
+        <div className="mt-4 space-y-4">
+          <Field label="Business activities"><TextArea value={data.businessActivities || ""} onChange={(v) => set("businessActivities", v)} /></Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Major clients"><TextInput value={data.majorClients || ""} onChange={(v) => set("majorClients", v)} /></Field>
+            <Field label="Country-wise market"><TextInput value={data.countryWiseMarket || ""} onChange={(v) => set("countryWiseMarket", v)} /></Field>
+          </div>
+          <Field label="Target audience (full)"><TextArea value={data.targetAudienceFull || ""} onChange={(v) => set("targetAudienceFull", v)} /></Field>
+          <Field label="Business keywords (up to 50)"><TextArea value={data.businessKeywords50 || ""} onChange={(v) => set("businessKeywords50", v)} /></Field>
+        </div>
+      </div>
+      <div>
+        <SectionHeader title="Products" />
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Total products"><NumberInput value={data.totalProducts || ""} onChange={(v) => set("totalProducts", v)} min={0} step={1} placeholder="e.g. 120" /></Field>
+          <Field label="Top-rated products"><NumberInput value={data.topRatedProducts || ""} onChange={(v) => set("topRatedProducts", v)} min={0} step={1} /></Field>
+          <Field label="Top product keywords"><TextInput value={data.topProductKeywords || ""} onChange={(v) => set("topProductKeywords", v)} /></Field>
+          <Field label="Important page / product"><TextInput value={data.importantPageOrProduct || ""} onChange={(v) => set("importantPageOrProduct", v)} /></Field>
+        </div>
+      </div>
+      <div>
+        <SectionHeader title="Assets & credentials" />
+        <div className="mt-4 space-y-4">
+          <Field label="Social media credentials"><TextArea value={data.socialMediaCredentials || ""} onChange={(v) => set("socialMediaCredentials", v)} /></Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Sample banners"><TextInput value={data.sampleBanners || ""} onChange={(v) => set("sampleBanners", v)} /></Field>
+            <Field label="Sample blogs"><TextInput value={data.sampleBlogs || ""} onChange={(v) => set("sampleBlogs", v)} /></Field>
+            <Field label="Sample copywriting"><TextInput value={data.sampleCopywriting || ""} onChange={(v) => set("sampleCopywriting", v)} /></Field>
+            <Field label="GSC details"><TextInput value={data.gscDetails || ""} onChange={(v) => set("gscDetails", v)} /></Field>
+          </div>
+        </div>
+      </div>
+      <div>
+        <SectionHeader title="SEO & links" />
+        <div className="mt-4 space-y-4">
+          <Field label="Dynamic URL recommendations"><TextInput value={data.dynamicUrlRecs || ""} onChange={(v) => set("dynamicUrlRecs", v)} /></Field>
+          <Field label="Existing search submissions"><TextInput value={data.existingSearchSubmissions || ""} onChange={(v) => set("existingSearchSubmissions", v)} /></Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Relevant links"><TextInput value={data.relevantLink || ""} onChange={(v) => set("relevantLink", v)} /></Field>
+            <Field label="Community engagements"><TextInput value={data.communityEngagements || ""} onChange={(v) => set("communityEngagements", v)} /></Field>
+            <Field label="SERP positioning"><TextInput value={data.serpPositioning || ""} onChange={(v) => set("serpPositioning", v)} /></Field>
+          </div>
+          <Field label="Competitor names / URLs"><TextArea value={data.competitorNamesUrls || ""} onChange={(v) => set("competitorNamesUrls", v)} /></Field>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── Step 3 ─────────────── */
+function StepReview({
+  data, service, consultantName, set,
+}: {
+  data: Partial<InquiryData>;
+  service?: ServiceCategory;
+  consultantName: string;
+  set: <K extends keyof InquiryData>(k: K, v: InquiryData[K]) => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionHeader title="Contact preferences" subtitle="How should we reach them?" />
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Preferred contact method">
+            <Select
+              value={data.preferredContactMethod || ""}
+              onChange={(v) => set("preferredContactMethod", v)}
+              options={[{ value: "", label: "Select…" }, ...CONTACT_METHODS.map((m) => ({ value: m, label: m }))]}
+            />
+          </Field>
+          <Field label="Preferred contact time">
+            <TextInput value={data.preferredContactTime || ""} onChange={(v) => set("preferredContactTime", v)} placeholder="e.g. 10am–4pm IST" />
+          </Field>
+        </div>
+        <div className="mt-4">
+          <Field label="Additional notes">
+            <TextArea value={data.additionalNotes || ""} onChange={(v) => set("additionalNotes", v)} placeholder="Anything else the team should know?" />
+          </Field>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-5">
+        <SectionHeader title="Review" subtitle="Confirm before saving." />
+        <dl className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <Summary label="Service" value={service || "—"} />
+          <Summary label="Created by" value={consultantName} highlight />
+          <Summary label="Client" value={data.fullName || "—"} />
+          <Summary label="Type" value={data.clientType || "—"} />
+          <Summary label="Email" value={data.email || "—"} />
+          <Summary label="Phone" value={data.phone || "—"} />
+          <Summary label="Company" value={data.companyName || "—"} />
+          <Summary label="Designation" value={data.designation || "—"} />
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── UI primitives ─────────────── */
+function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-stone-900">{title}</h3>
+      {subtitle && <p className="text-xs text-stone-500 mt-0.5">{subtitle}</p>}
+    </div>
+  );
+}
+
+function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-[11px] font-semibold text-stone-700 mb-1.5">
+        {label}
+        {required && <span className="text-rose-500 ml-0.5">*</span>}
+      </label>
+      {children}
+      {error && <p className="mt-1 text-[11px] text-rose-600 font-medium">{error}</p>}
+    </div>
+  );
+}
+
+const inputBase = "w-full px-3.5 py-2.5 text-sm text-stone-900 bg-white rounded-lg border transition-colors placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500";
+
+function TextInput({ value, onChange, placeholder, type = "text", autoFocus }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; type?: string; autoFocus?: boolean;
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      className={`${inputBase} border-stone-300 hover:border-stone-400`}
+    />
+  );
+}
+
+function TextArea({ value, onChange, placeholder, rows = 3 }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; rows?: number;
+}) {
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      className={`${inputBase} border-stone-300 hover:border-stone-400 resize-y min-h-[80px]`}
+    />
+  );
+}
+
+function NumberInput({ value, onChange, min, max, step = 1, placeholder }: {
+  value: string; onChange: (v: string) => void; min?: number; max?: number; step?: number; placeholder?: string;
+}) {
+  const sanitize = (raw: string) => {
+    let s = raw.replace(/[^\d.-]/g, "");
+    if ((min ?? 0) >= 0) s = s.replace(/-/g, "");
+    return s;
+  };
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      value={value}
+      onChange={(e) => onChange(sanitize(e.target.value))}
+      min={min}
+      max={max}
+      step={step}
+      placeholder={placeholder}
+      className={`${inputBase} border-stone-300 hover:border-stone-400 tabular-nums`}
+    />
+  );
+}
+
+function DateInput({ value, onChange, min, max }: {
+  value: string; onChange: (v: string) => void; min?: string; max?: string;
+}) {
+  return (
+    <input
+      type="date"
+      value={value}
+      min={min}
+      max={max}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${inputBase} border-stone-300 hover:border-stone-400`}
+    />
+  );
+}
+
+function Select({ value, onChange, options, placeholder = "Select…" }: {
+  value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState<number>(-1);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const selected = options.find((o) => o.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      const idx = options.findIndex((o) => o.value === value);
+      setHighlight(idx >= 0 ? idx : 0);
+    }
+  }, [open, options, value]);
+
+  const commit = (idx: number) => {
+    const o = options[idx];
+    if (!o) return;
+    onChange(o.value);
+    setOpen(false);
+    btnRef.current?.focus();
+  };
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+        className={`w-full px-3.5 py-2.5 text-sm text-left rounded-lg border bg-white transition-colors flex items-center justify-between gap-2 ${
+          open ? "border-indigo-500 ring-2 ring-indigo-500/30" : "border-stone-300 hover:border-stone-400"
+        }`}
+      >
+        <span className={selected ? "text-stone-900" : "text-stone-400"}>{selected?.label || placeholder}</span>
+        <svg className={`w-4 h-4 text-stone-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          className="absolute z-30 mt-1.5 w-full max-h-64 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-xl ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1 duration-150"
+          role="listbox"
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") { e.preventDefault(); setHighlight((h) => Math.min(h + 1, options.length - 1)); }
+            else if (e.key === "ArrowUp") { e.preventDefault(); setHighlight((h) => Math.max(h - 1, 0)); }
+            else if (e.key === "Enter") { e.preventDefault(); commit(highlight); }
+            else if (e.key === "Escape") { setOpen(false); }
+          }}
+          tabIndex={-1}
+        >
+          {options.map((o, i) => {
+            const isActive = i === highlight;
+            const isSelected = o.value === value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                onMouseEnter={() => setHighlight(i)}
+                onClick={() => commit(i)}
+                className={`w-full text-left px-3.5 py-2.5 text-sm flex items-center justify-between gap-2 transition-colors ${
+                  isActive ? "bg-indigo-50 text-indigo-900" : "text-stone-700"
+                }`}
+              >
+                <span>{o.label}</span>
+                {isSelected && (
+                  <svg className="w-4 h-4 text-indigo-600 shrink-0" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Summary({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="flex flex-col">
+      <dt className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">{label}</dt>
+      <dd className={`mt-0.5 ${highlight ? "font-semibold text-indigo-700" : "text-stone-800"}`}>{value}</dd>
+    </div>
+  );
+}

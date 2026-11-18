@@ -26,7 +26,7 @@ export async function GET() {
 
     const formattedUsers = users.map((u: any) => ({
       _id: u._id.toString(),
-      username: u.username,
+      name: u.name,
       email: u.email,
       phone: u.phone || "",
       profilePicture: u.profilePicture || "",
@@ -35,6 +35,7 @@ export async function GET() {
       updatedAt: u.updatedAt,
       passwordRequest: u.passwordRequest || false,
       requestDate: u.requestDate,
+      tempPassword: u.tempPassword || "",
     }));
 
     return NextResponse.json({ success: true, users: formattedUsers });
@@ -50,36 +51,34 @@ export async function POST(req: Request) {
     if (!admin) return NextResponse.json({ success: false, error: "Admin only" }, { status: 403 });
 
     await connectDB();
-    const { username, password, role, email, phone } = await req.json();
+    const { name, password, role, email, phone, profilePicture } = await req.json();
 
-    if (!username || !password || !email) {
-      return NextResponse.json({ success: false, error: "Username, email and password required" }, { status: 400 });
+    if (!name || !password || !email) {
+      return NextResponse.json({ success: false, error: "Name, email and password required" }, { status: 400 });
     }
     if (password.length < 6) {
       return NextResponse.json({ success: false, error: "Password must be at least 6 characters" }, { status: 400 });
     }
 
     const validRole = role === "admin" ? "admin" : "business_developer";
-    const lowerUser = username.toLowerCase().trim();
     const lowerEmail = email.toLowerCase().trim();
-
-    const existingUser = await User.findOne({ username: lowerUser });
-    if (existingUser) return NextResponse.json({ success: false, error: "Username already exists" }, { status: 409 });
 
     const existingEmail = await User.findOne({ email: lowerEmail });
     if (existingEmail) return NextResponse.json({ success: false, error: "Email already in use" }, { status: 409 });
 
     const user = await User.create({
-      username: lowerUser,
+      name,
       email: lowerEmail,
       phone: phone || "",
       password,
+      tempPassword: password, // Store plain text version for admin dashboard reveal
       role: validRole,
+      profilePicture: profilePicture || "",
     });
 
     // Fire welcome email (non-blocking failure)
     try {
-      const tpl = welcomeEmail(user.username, password);
+      const tpl = welcomeEmail(user.name, password, user.email);
       await sendMail({ to: user.email, subject: tpl.subject, html: tpl.html });
     } catch (mailErr) {
       console.error("Welcome email failed:", mailErr);
@@ -89,7 +88,7 @@ export async function POST(req: Request) {
       success: true,
       user: {
         _id: user._id.toString(),
-        username: user.username,
+        name: user.name,
         email: user.email,
         phone: user.phone,
         role: user.role,
@@ -112,7 +111,7 @@ export async function PATCH(req: Request) {
       userId,
       newPassword,
       clearRequest,
-      newUsername,
+      newName,
       newRole,
       newEmail,
       newPhone,
@@ -132,7 +131,7 @@ export async function PATCH(req: Request) {
       }
       const hashed = await bcrypt.hash(newPassword, 10);
       updates.password = hashed;
-      updates.tempPassword = newPassword; // for reference; dashboard reveal removed
+      updates.tempPassword = newPassword; // Store temp password for admin dashboard reference
       plainPasswordForEmail = newPassword;
     }
 
@@ -141,11 +140,8 @@ export async function PATCH(req: Request) {
       updates.tempPassword = "";
     }
 
-    if (newUsername) {
-      const formatted = newUsername.toLowerCase().trim();
-      const existing = await User.findOne({ username: formatted, _id: { $ne: userId } });
-      if (existing) return NextResponse.json({ success: false, error: "Username already taken" }, { status: 409 });
-      updates.username = formatted;
+    if (newName) {
+      updates.name = newName.trim();
     }
 
     if (newEmail) {
@@ -159,12 +155,12 @@ export async function PATCH(req: Request) {
 
     if (newRole) updates.role = newRole === "admin" ? "admin" : "business_developer";
 
-    await User.findByIdAndUpdate(userId, { $set: updates }, { new: true });
+    const updatedUser = await User.findByIdAndUpdate(userId, { $set: updates }, { new: true });
 
     // Send email when password was set
-    if (plainPasswordForEmail) {
+    if (plainPasswordForEmail && updatedUser) {
       try {
-        const tpl = passwordChangedEmail(user.username, plainPasswordForEmail);
+        const tpl = passwordChangedEmail(updatedUser.name, plainPasswordForEmail);
         await sendMail({ to: updates.email || user.email, subject: tpl.subject, html: tpl.html });
       } catch (mailErr) {
         console.error("Password-changed email failed:", mailErr);

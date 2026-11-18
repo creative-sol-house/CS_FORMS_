@@ -5,21 +5,19 @@ import { sendMail, passwordRequestAdminEmail } from "@/lib/mailer";
 
 export async function POST(req: Request) {
   try {
-    const { identifier } = await req.json();
-    if (!identifier) {
-      return NextResponse.json({ success: false, error: "Username or email required" }, { status: 400 });
+    const { email } = await req.json();
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      return NextResponse.json({ success: false, error: "Valid email address is required." }, { status: 400 });
     }
 
     await connectDB();
-    const lookup = identifier.toLowerCase().trim();
+    const normalizedEmail = email.toLowerCase().trim();
 
-    // 1. Find the user (the developer) requesting the reset
-    const user = await User.findOne({
-      $or: [{ username: lookup }, { email: lookup }],
-    });
+    // 1. Find the user strictly by email
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
-      return NextResponse.json({ success: false, error: "No account found." }, { status: 404 });
+      return NextResponse.json({ success: false, error: "No account found with this email." }, { status: 404 });
     }
 
     // 2. Rate Limiting (5 mins)
@@ -38,10 +36,12 @@ export async function POST(req: Request) {
     
     try {
       // Find all admins
-      const admins = await User.find({ role: "admin" }).select("email username").lean();
+      const admins = await User.find({ role: "admin" }).select("email name").lean();
       
       // Get valid emails from DB
-      let targetEmails = admins.filter((a) => a.email && a.email.trim() !== "").map(a => a.email as string);
+      let targetEmails = admins
+        .filter((a) => a.email && a.email.trim() !== "")
+        .map((a) => a.email as string);
       
       // FALLBACK: If no admin emails found in DB, use the SMTP_USER from .env
       if (targetEmails.length === 0) {
@@ -50,14 +50,14 @@ export async function POST(req: Request) {
         targetEmails = [process.env.SMTP_USER];
       }
 
-      const tpl = passwordRequestAdminEmail(user.username, user.email);
+      const tpl = passwordRequestAdminEmail(user.name, user.email);
       
       // Send to all valid admins (or the fallback)
       await Promise.all(
-        targetEmails.map((email) => sendMail({ to: email, subject: tpl.subject, html: tpl.html }))
+        targetEmails.map((adminEmail) => sendMail({ to: adminEmail, subject: tpl.subject, html: tpl.html }))
       );
       
-      console.log(`✅ Password request for ${user.username} sent to: ${targetEmails.join(", ")}`);
+      console.log(`✅ Password request for ${user.name} (${user.email}) sent to: ${targetEmails.join(", ")}`);
     } catch (mailErr: any) {
       console.error("❌ Admin notify email failed:", mailErr.message);
       emailStatus = "request saved, but email notification failed. Check server logs.";

@@ -92,11 +92,11 @@ export default function Sidebar({ user, view, setView, passwordRequestCount, log
               {user.profilePicture ? (
                 <img src={user.profilePicture} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                user.username.charAt(0).toUpperCase()
+                user.name.charAt(0).toUpperCase()
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-black truncate">{user.username}</p>
+              <p className="text-sm font-medium text-black truncate">{user.name}</p>
               <p className="text-[10px] text-black/60 uppercase tracking-wider truncate">
                 {user.role.replace("_", " ")}
               </p>

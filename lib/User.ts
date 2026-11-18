@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 export type Role = "admin" | "business_developer";
 
 export interface IUser extends Document {
-  username: string;
+  name: string;
   email: string;
   phone?: string;
   profilePicture?: string;
@@ -18,9 +18,22 @@ export interface IUser extends Document {
   comparePassword(candidate: string): Promise<boolean>;
 }
 
+const capitalizeWords = (str: string): string =>
+  str
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+
 const UserSchema = new Schema<IUser>(
   {
-    username: { type: String, required: true, unique: true, trim: true, lowercase: true },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      set: capitalizeWords,
+    },
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     phone: { type: String, trim: true, default: "" },
     profilePicture: { type: String, default: "" },

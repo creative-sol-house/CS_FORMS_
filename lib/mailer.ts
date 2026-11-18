@@ -102,7 +102,7 @@ const emailWrapper = (content: string) => `
 
 /* ---------- Template helpers ---------- */
 
-export function passwordRequestAdminEmail(username: string, email: string) {
+export function passwordRequestAdminEmail(name: string, email: string) {
   const content = `
     <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 22px; font-weight: 600;">Password Reset Request</h2>
     <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
@@ -112,8 +112,8 @@ export function passwordRequestAdminEmail(username: string, email: string) {
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
       <tr>
         <td style="padding: 16px; border-bottom: 1px solid #e2e8f0;">
-          <span style="display: block; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Username</span>
-          <span style="display: block; color: #0f172a; font-size: 15px; font-weight: 500;">${username}</span>
+          <span style="display: block; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Name</span>
+          <span style="display: block; color: #0f172a; font-size: 15px; font-weight: 500;">${name}</span>
         </td>
       </tr>
       <tr>
@@ -124,19 +124,19 @@ export function passwordRequestAdminEmail(username: string, email: string) {
       </tr>
     </table>
 
-    <a href="https://your-domain.com/admin" style="display: inline-block; background-color: #4f46e5; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 6px;">
+    <a href="https://inquiry.cshouse.net/sol-ad-dash" style="display: inline-block; background-color: #4f46e5; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 6px;">
       Go to Admin Dashboard
     </a>
   `;
   return {
-    subject: `Action Required: Password reset requested by ${username}`,
+    subject: `Action Required: Password reset requested by ${name}`,
     html: emailWrapper(content),
   };
 }
 
-export function welcomeEmail(username: string, password: string) {
+export function welcomeEmail(name: string, email: string, password: string) {
   const content = `
-    <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 22px; font-weight: 600;">Welcome to the Team, ${username}!</h2>
+    <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 22px; font-weight: 600;">Welcome to the Team, ${name}!</h2>
     <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
       Your CRM account has been successfully created. Below are your login credentials.
     </p>
@@ -144,8 +144,8 @@ export function welcomeEmail(username: string, password: string) {
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
       <tr>
         <td style="padding: 16px; border-bottom: 1px solid #e2e8f0;">
-          <span style="display: block; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Username</span>
-          <span style="display: block; color: #0f172a; font-size: 15px; font-weight: 500;">${username}</span>
+          <span style="display: block; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Login Email</span>
+          <span style="display: block; color: #0f172a; font-size: 15px; font-weight: 500;">${email}</span>
         </td>
       </tr>
       <tr>
@@ -156,7 +156,7 @@ export function welcomeEmail(username: string, password: string) {
       </tr>
     </table>
 
-    <a href="https://your-domain.com/login" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 6px;">
+    <a href="https://inquiry.cshouse.net/sol-ad-dash" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 6px;">
       Log In to Your Account
     </a>
   `;
@@ -166,11 +166,11 @@ export function welcomeEmail(username: string, password: string) {
   };
 }
 
-export function passwordChangedEmail(username: string, newPassword: string) {
+export function passwordChangedEmail(name: string, newPassword: string) {
   const content = `
     <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 22px; font-weight: 600;">Password Updated</h2>
     <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
-      Hi ${username}, an administrator has reset your CRM password. Your new temporary password is below.
+      Hi ${name}, an administrator has reset your CRM password. Your new temporary password is below.
     </p>
     
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
@@ -188,7 +188,7 @@ export function passwordChangedEmail(username: string, newPassword: string) {
       </p>
     </div>
 
-    <a href="https://your-domain.com/login" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 6px;">
+    <a href="https://inquiry.cshouse.net/sol-ad-dash" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 6px;">
       Log In Now
     </a>
   `;
@@ -199,13 +199,13 @@ export function passwordChangedEmail(username: string, newPassword: string) {
 }
 
 export function leadAssignedEmail(
-  username: string,
+  name: string,
   lead: { fullName: string; email: string; phone: string; serviceCategory?: string; status?: string }
 ) {
   const content = `
     <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 22px; font-weight: 600;">New Lead Assigned</h2>
     <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
-      Hi ${username}, a new lead has been assigned to you. Please review the details below and reach out to the client as soon as possible.
+      Hi ${name}, a new lead has been assigned to you. Please review the details below and reach out to the client as soon as possible.
     </p>
     
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
@@ -245,6 +245,46 @@ export function leadAssignedEmail(
   `;
   return {
     subject: `New Lead: ${lead.fullName} (${lead.serviceCategory || "General"})`,
+    html: emailWrapper(content),
+  };
+}
+
+
+
+export function leadCreatedByDeveloperEmail(
+  adminName: string,
+  creatorName: string,
+  lead: { fullName: string; email: string; phone: string; serviceCategory?: string }
+) {
+  const content = `
+    <h2 style="margin:0 0 16px;color:#0f172a;font-size:22px;font-weight:600;">New Lead Added by Team Member</h2>
+    <p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">
+      Hi ${adminName}, <strong>${creatorName}</strong> just added a new lead from the dashboard.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:24px;">
+      <tr><td style="padding:16px;border-bottom:1px solid #e2e8f0;">
+        <span style="display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:600;">Client</span>
+        <span style="color:#0f172a;font-size:15px;font-weight:500;">${lead.fullName}</span>
+      </td></tr>
+      <tr><td style="padding:16px;border-bottom:1px solid #e2e8f0;">
+        <span style="display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:600;">Email</span>
+        <a href="mailto:${lead.email}" style="color:#4f46e5;">${lead.email}</a>
+      </td></tr>
+      <tr><td style="padding:16px;border-bottom:1px solid #e2e8f0;">
+        <span style="display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:600;">Phone</span>
+        <a href="tel:${lead.phone}" style="color:#4f46e5;">${lead.phone}</a>
+      </td></tr>
+      <tr><td style="padding:16px;">
+        <span style="display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:600;">Service</span>
+        <span style="color:#0f172a;">${lead.serviceCategory || "N/A"}</span>
+      </td></tr>
+    </table>
+    <a href="https://inquiry.cshouse.net/sol-ad-dash?tab=leads"
+       style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;">
+      Review in Dashboard
+    </a>`;
+  return {
+    subject: `New lead from ${creatorName}: ${lead.fullName}`,
     html: emailWrapper(content),
   };
 }

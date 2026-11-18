@@ -7,7 +7,7 @@ export type Role = "admin" | "business_developer";
 
 export interface SessionPayload {
   userId: string;
-  username: string;
+  name: string;
   email: string;
   role: Role;
 }

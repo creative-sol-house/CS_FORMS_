@@ -36,6 +36,9 @@ export interface InquiryData {
   phone: string;
   clientType: ClientType;
   consultantName: string;
+  consultantId?: string;
+createdBy?: string;
+createdById?: string;
   companyName?: string;
   designation?: string;
   requirementType?: RequirementType;
@@ -98,7 +101,6 @@ export interface InquiryData {
   subscribeUpdates?: boolean;
 }
 
-
 export interface InquiryDoc extends InquiryData {
   _id: string;
   createdAt: string;
@@ -106,17 +108,18 @@ export interface InquiryDoc extends InquiryData {
   assignedTo?: string;
   status: LeadStatus;
   notes: string;
-  messages: ChatMessage[];        // ← was: Array<{ text; sender; timestamp; readBy }>
+  messages: ChatMessage[];
   communicationMode?: CommunicationMode;
   onsiteAddress?: string;
   auditLogs: AuditLog[];
   submissionLocation?: SubmissionLocation;
 }
+
 export type Role = "admin" | "business_developer";
 
 export interface UserDoc {
   _id: string;
-  username: string;
+  name: string;
   email: string;
   phone?: string;
   profilePicture?: string;
@@ -125,14 +128,15 @@ export interface UserDoc {
   updatedAt: string;
   passwordRequest?: boolean;
   requestDate?: string;
+  tempPassword?: string;
 }
 
 export interface SessionUser {
   userId: string;
-  username: string;
+  name: string;
   email: string;
   role: Role;
-  profilePicture?: string; // <-- Add this
+  profilePicture?: string;
   passwordRequest?: boolean;
 }
 

@@ -4,7 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import Inquiry from "@/lib/Inquiry";
 import User from "@/lib/User";
 import { verifySession } from "@/lib/auth";
-import { sendMail, leadAssignedEmail } from "@/lib/mailer";
+import { sendMail, leadAssignedEmail, leadCreatedByDeveloperEmail } from "@/lib/mailer";
 import { broadcastLeadUpdate } from "./stream/route";
 
 async function getSession() {
@@ -15,7 +15,7 @@ async function getSession() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// GET — list leads (admin) / list assigned leads (developer)
+// GET — list leads (admin) / list assigned-or-created leads (developer)
 //       Supports ?focus=<id> to return a single lead (fast poll)
 // ─────────────────────────────────────────────────────────────
 export async function GET(req: Request) {
@@ -38,20 +38,31 @@ export async function GET(req: Request) {
       if (!one)
         return NextResponse.json({ success: true, inquiries: [] });
 
-      // Permission check for non-admins
-      if (session.role !== "admin" && one.assignedTo !== session.username) {
-        return NextResponse.json(
-          { success: false, error: "Forbidden" },
-          { status: 403 }
-        );
+      // Permission check for non-admins: must own it OR be assigned to it
+      if (session.role !== "admin") {
+        const ownsIt = (one as any).createdById === session.userId;
+        const assigned = one.assignedTo === session.name;
+        if (!ownsIt && !assigned) {
+          return NextResponse.json(
+            { success: false, error: "Forbidden" },
+            { status: 403 }
+          );
+        }
       }
 
       return NextResponse.json({ success: true, inquiries: [one] });
     }
 
-    // Full list
+    // Full list — non-admins see leads they created OR are assigned to
     const query =
-      session.role === "admin" ? {} : { assignedTo: session.username };
+      session.role === "admin"
+        ? {}
+        : {
+            $or: [
+              { assignedTo: session.name },
+              { createdById: session.userId },
+            ],
+          };
 
     const inquiries = await Inquiry.find(query)
       .sort({ createdAt: -1 })
@@ -59,6 +70,76 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ success: true, inquiries });
   } catch (err: any) {
+    return NextResponse.json(
+      { success: false, error: err.message },
+      { status: 500 }
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// POST — create a lead (admin or business_developer)
+// ─────────────────────────────────────────────────────────────
+export async function POST(req: Request) {
+  try {
+    const session = await getSession();
+    if (!session)
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+
+    await connectDB();
+    const body = await req.json();
+
+    // Server-enforced creator identity — never trust client
+    const payload = {
+      ...body,
+      consultantName: session.name,
+      consultantId: session.userId,
+      createdBy: session.name,
+      createdById: session.userId,
+      status: "Pending",
+      notes: "",
+      messages: [],
+      auditLogs: [
+        {
+          action: "Created",
+          details: `Lead created by ${session.name} (${session.role})`,
+          performedBy: session.name,
+          timestamp: new Date(),
+        },
+      ],
+      assignedTo:
+        session.role === "business_developer"
+          ? session.name
+          : body.assignedTo || "",
+    };
+    delete (payload as any).newMessage;
+    delete (payload as any).markRead;
+
+    const lead = await Inquiry.create(payload);
+
+    // ── Email every admin
+    try {
+      const admins = await User.find({ role: "admin" }).lean();
+      for (const admin of admins) {
+        if (!admin.email) continue;
+        const tpl = leadCreatedByDeveloperEmail(admin.name, session.name, lead);
+        await sendMail({ to: admin.email, subject: tpl.subject, html: tpl.html });
+      }
+    } catch (mailErr) {
+      console.error("Admin notify email failed:", mailErr);
+    }
+
+    // ── Broadcast so other open dashboards update live
+    try {
+      broadcastLeadUpdate(lead.toObject ? lead.toObject() : lead);
+    } catch {}
+
+    return NextResponse.json({ success: true, inquiry: lead });
+  } catch (err: any) {
+    console.error("POST /api/admin/inquiries error:", err);
     return NextResponse.json(
       { success: false, error: err.message },
       { status: 500 }
@@ -95,12 +176,32 @@ export async function PATCH(req: Request) {
         { status: 404 }
       );
 
-    // Non-admins may only touch their own assigned leads
-    if (session.role !== "admin" && inquiry.assignedTo !== session.username) {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 }
+    // ── PERMISSIONS ──────────────────────────────────────────────────────────
+    if (session.role !== "admin") {
+      // Determine if the request is trying to update form data (anything other than status/notes/assignment/chat)
+      const isEditingFormData = Object.keys(updates).some(
+        (key) => !["status", "notes", "assignedTo", "newMessage", "markRead"].includes(key)
       );
+
+      const createdById = (inquiry as any).createdById as string | undefined;
+      const ownsIt = createdById === session.userId;
+      const assigned = inquiry.assignedTo === session.name;
+
+      // If a BD is trying to edit form data, they MUST be the creator.
+      if (isEditingFormData && !ownsIt) {
+        return NextResponse.json(
+          { success: false, error: "You can only edit leads you created." },
+          { status: 403 }
+        );
+      }
+
+      // If they are not the creator and not assigned, they can't touch it at all
+      if (!ownsIt && !assigned) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden" },
+          { status: 403 }
+        );
+      }
     }
 
     const logDetails: string[] = [];
@@ -129,10 +230,10 @@ export async function PATCH(req: Request) {
       updateQuery.$push = updateQuery.$push || {};
       updateQuery.$push.messages = {
         text,
-        sender: session.username,
+        sender: session.name,
         senderRole: session.role,
         timestamp: new Date(),
-        readBy: [session.username],
+        readBy: [session.name],
       };
     }
 
@@ -142,7 +243,7 @@ export async function PATCH(req: Request) {
       auditEntries.push({
         action: "Update",
         details: logDetails.join(", "),
-        performedBy: session.username,
+        performedBy: session.name,
         timestamp: new Date(),
       });
     }
@@ -150,7 +251,7 @@ export async function PATCH(req: Request) {
       auditEntries.push({
         action: "Note",
         details: updates.notes?.trim() || "(cleared)",
-        performedBy: session.username,
+        performedBy: session.name,
         timestamp: new Date(),
       });
     }
@@ -163,12 +264,12 @@ export async function PATCH(req: Request) {
     if (markRead) {
       inquiry.messages.forEach((msg: any, idx: number) => {
         if (
-          msg.sender !== session.username &&
-          !msg.readBy?.includes(session.username)
+          msg.sender !== session.name &&
+          !msg.readBy?.includes(session.name)
         ) {
           updateQuery.$set[`messages.${idx}.readBy`] = [
             ...(msg.readBy || []),
-            session.username,
+            session.name,
           ];
         }
       });
@@ -195,7 +296,7 @@ export async function PATCH(req: Request) {
           username: updates.assignedTo,
         }).lean();
         if (assignedUser?.email) {
-          const tpl = leadAssignedEmail(assignedUser.username, updated as any);
+          const tpl = leadAssignedEmail(assignedUser.name, updated as any);
           await sendMail({
             to: assignedUser.email,
             subject: tpl.subject,
@@ -272,5 +373,5 @@ export async function DELETE(req: Request) {
       { success: false, error: err.message },
       { status: 500 }
     );
-  }
 }
+  }

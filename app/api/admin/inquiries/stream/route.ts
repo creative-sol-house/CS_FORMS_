@@ -50,7 +50,7 @@ export async function GET() {
       // Send an initial snapshot so client is in sync
       try {
         const query =
-          session.role === "admin" ? {} : { assignedTo: session.username };
+          session.role === "admin" ? {} : { assignedTo: session.name };
         const inquiries = await Inquiry.find(query).sort({ createdAt: -1 }).lean();
         controller.enqueue(
           enc.encode(
