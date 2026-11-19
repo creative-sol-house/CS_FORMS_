@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
-import { InquiryData, SubmissionLocation, AuditLog } from "./types";
+import { InquiryData, SubmissionLocation, AuditLog, FollowUp, LeadAttachment } from "./types";
 
 export interface IInquiry extends InquiryData, Document {
   assignedTo?: string;
@@ -10,6 +10,8 @@ export interface IInquiry extends InquiryData, Document {
   onsiteAddress?: string;
   auditLogs: AuditLog[];
   submissionLocation?: SubmissionLocation;
+  followUps?: FollowUp[]; // Explicitly declare it here too for safety
+  attachments?: LeadAttachment[];
 }
 
 const SubmissionLocationSchema = new Schema<SubmissionLocation>(
@@ -24,9 +26,10 @@ const MessageSchema = new Schema(
     senderRole: { type: String, enum: ["admin", "business_developer"] },
     timestamp:  { type: Date, default: Date.now },
     readBy:     [{ type: String, trim: true }],
-  },
+  }, 
   { _id: true }
 );
+
 const InquirySchema = new Schema<IInquiry>(
   {
     serviceCategory: { type: String, enum: ["Automation Software", "Web Development", "Logo Design", "Digital Marketing"] },
@@ -36,8 +39,8 @@ const InquirySchema = new Schema<IInquiry>(
     clientType: { type: String, required: true, enum: ["Individual", "Business"] },
     consultantName: { type: String, required: true, trim: true },
     consultantId: { type: String, trim: true },
-createdBy: { type: String, trim: true },
-createdById: { type: String, trim: true },
+    createdBy: { type: String, trim: true },
+    createdById: { type: String, trim: true },
     companyName: { type: String, trim: true },
     designation: { type: String, trim: true },
     requirementType: { type: String, enum: ["Commodity", "Service"] },
@@ -103,12 +106,34 @@ createdById: { type: String, trim: true },
     status: { type: String, enum: ["Interested", "Pending", "Call Back", "Approved", "Not Interested"], default: "Pending" },
     notes: { type: String, default: "" },
     
-  messages: { type: [MessageSchema], default: [] },
+    messages: { type: [MessageSchema], default: [] },
 
     communicationMode: { type: String, enum: ["Call", "WhatsApp Msg", "WhatsApp Call", "Text Msg", "Email", "Zoom Meeting", "Onsite Meeting"] },
     onsiteAddress: { type: String, default: "" },
     auditLogs: [{ action: { type: String, required: true }, details: { type: String }, performedBy: { type: String, required: true }, timestamp: { type: Date, default: Date.now } }],
     submissionLocation: { type: SubmissionLocationSchema, default: {} },
+    
+    attachments: [
+      {
+        url: String,
+        publicId: String,
+        fileName: String,
+        fileType: String,
+        fileSize: Number,
+        uploadedBy: String,
+        uploadedAt: Date,
+      },
+    ],
+    
+    followUps: [
+      {
+        date: Date,
+        note: String,
+        type: { type: String, enum: ["Call", "Meeting", "Email", "Other"], default: "Call" },
+        loggedBy: String,
+        loggedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );

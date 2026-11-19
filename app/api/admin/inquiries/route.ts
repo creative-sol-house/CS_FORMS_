@@ -4,8 +4,13 @@ import { connectDB } from "@/lib/mongodb";
 import Inquiry from "@/lib/Inquiry";
 import User from "@/lib/User";
 import { verifySession } from "@/lib/auth";
-import { sendMail, leadAssignedEmail, leadCreatedByDeveloperEmail } from "@/lib/mailer";
+import {
+  sendMail,
+  leadAssignedEmail,
+  leadCreatedByDeveloperEmail,
+} from "@/lib/mailer";
 import { broadcastLeadUpdate } from "./stream/route";
+import cloudinary from "cloudinary";
 
 async function getSession() {
   const cookieStore = await cookies();
@@ -102,6 +107,7 @@ export async function POST(req: Request) {
       status: "Pending",
       notes: "",
       messages: [],
+      attachments: Array.isArray(body.attachments) ? body.attachments : [],
       auditLogs: [
         {
           action: "Created",
@@ -109,6 +115,16 @@ export async function POST(req: Request) {
           performedBy: session.name,
           timestamp: new Date(),
         },
+        ...(Array.isArray(body.attachments) && body.attachments.length > 0
+          ? [
+              {
+                action: "Attachments",
+                details: `${body.attachments.length} file(s) attached on creation`,
+                performedBy: session.name,
+                timestamp: new Date(),
+              },
+            ]
+          : []),
       ],
       assignedTo:
         session.role === "business_developer"
@@ -125,7 +141,11 @@ export async function POST(req: Request) {
       const admins = await User.find({ role: "admin" }).lean();
       for (const admin of admins) {
         if (!admin.email) continue;
-        const tpl = leadCreatedByDeveloperEmail(admin.name, session.name, lead);
+        const tpl = leadCreatedByDeveloperEmail(
+          admin.name,
+          session.name,
+          lead
+        );
         await sendMail({ to: admin.email, subject: tpl.subject, html: tpl.html });
       }
     } catch (mailErr) {
@@ -149,7 +169,7 @@ export async function POST(req: Request) {
 
 // ─────────────────────────────────────────────────────────────
 // PATCH — update lead fields, notes, assignment, chat messages,
-//         read receipts, and broadcast changes via SSE
+//         read receipts, attachments, and broadcast changes via SSE
 // ─────────────────────────────────────────────────────────────
 export async function PATCH(req: Request) {
   try {
@@ -178,16 +198,17 @@ export async function PATCH(req: Request) {
 
     // ── PERMISSIONS ──────────────────────────────────────────────────────────
     if (session.role !== "admin") {
-      // Determine if the request is trying to update form data (anything other than status/notes/assignment/chat)
       const isEditingFormData = Object.keys(updates).some(
-        (key) => !["status", "notes", "assignedTo", "newMessage", "markRead"].includes(key)
+        (key) =>
+          !["status", "notes", "assignedTo", "newMessage", "markRead"].includes(
+            key
+          )
       );
 
       const createdById = (inquiry as any).createdById as string | undefined;
       const ownsIt = createdById === session.userId;
       const assigned = inquiry.assignedTo === session.name;
 
-      // If a BD is trying to edit form data, they MUST be the creator.
       if (isEditingFormData && !ownsIt) {
         return NextResponse.json(
           { success: false, error: "You can only edit leads you created." },
@@ -195,7 +216,6 @@ export async function PATCH(req: Request) {
         );
       }
 
-      // If they are not the creator and not assigned, they can't touch it at all
       if (!ownsIt && !assigned) {
         return NextResponse.json(
           { success: false, error: "Forbidden" },
@@ -213,6 +233,14 @@ export async function PATCH(req: Request) {
     const markRead: boolean = !!updates.markRead;
     delete updates.newMessage;
     delete updates.markRead;
+
+    // ── FIX: Delete immutable/system fields to prevent MongoDB conflicts ──
+    delete updates._id;
+    delete updates.auditLogs;
+    delete updates.messages;
+    delete updates.createdAt;
+    delete updates.updatedAt;
+    delete updates.__v;
 
     if (updates.status && updates.status !== inquiry.status)
       logDetails.push(`Status: ${inquiry.status} → ${updates.status}`);
@@ -255,6 +283,47 @@ export async function PATCH(req: Request) {
         timestamp: new Date(),
       });
     }
+
+    // ── ATTACHMENTS AUDIT + CLEANUP ─────────────────────────────────────
+    if (updates.attachments !== undefined && Array.isArray(updates.attachments)) {
+      const newIds = new Set<string>(
+        updates.attachments
+          .map((a: any) => a?.publicId)
+          .filter((v: any): v is string => typeof v === "string" && !!v)
+      );
+
+      const removedIds: string[] = Array.isArray(inquiry.attachments)
+        ? (inquiry.attachments as any[])
+            .map((a) => a?.publicId)
+            .filter(
+              (v: any): v is string =>
+                typeof v === "string" && !!v && !newIds.has(v)
+            )
+        : [];
+
+      auditEntries.push({
+        action: "Attachments",
+        details: `${updates.attachments.length} file(s) attached${
+          removedIds.length > 0 ? ` · ${removedIds.length} removed` : ""
+        }`,
+        performedBy: session.name,
+        timestamp: new Date(),
+      });
+
+      if (removedIds.length > 0) {
+        cloudinary.v2.config({
+          cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+          api_key: process.env.CLOUDINARY_API_KEY,
+          api_secret: process.env.CLOUDINARY_API_SECRET,
+        });
+        Promise.allSettled(
+          removedIds.map((pid) =>
+            cloudinary.v2.uploader.destroy(pid, { resource_type: "raw" })
+          )
+        ).catch((e) => console.error("Cloudinary cleanup failed:", e));
+      }
+    }
+
     if (auditEntries.length > 0) {
       updateQuery.$push = updateQuery.$push || {};
       updateQuery.$push.auditLogs = { $each: auditEntries };
@@ -263,10 +332,7 @@ export async function PATCH(req: Request) {
     // ── Read receipts: mark every message not sent by me as read
     if (markRead) {
       inquiry.messages.forEach((msg: any, idx: number) => {
-        if (
-          msg.sender !== session.name &&
-          !msg.readBy?.includes(session.name)
-        ) {
+        if (msg.sender !== session.name && !msg.readBy?.includes(session.name)) {
           updateQuery.$set[`messages.${idx}.readBy`] = [
             ...(msg.readBy || []),
             session.name,
@@ -359,6 +425,23 @@ export async function DELETE(req: Request) {
         { status: 404 }
       );
 
+    // Best-effort: purge all attachments from Cloudinary (non-blocking)
+    if (Array.isArray((deleted as any).attachments) && (deleted as any).attachments.length > 0) {
+      cloudinary.v2.config({
+        cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+      });
+      Promise.allSettled(
+        (deleted as any).attachments
+          .map((a: any) => a?.publicId)
+          .filter((v: any): v is string => typeof v === "string" && !!v)
+          .map((pid: string) =>
+            cloudinary.v2.uploader.destroy(pid, { resource_type: "raw" })
+          )
+      ).catch((e) => console.error("Cloudinary delete cleanup failed:", e));
+    }
+
     // Broadcast deletion so connected clients drop the row immediately
     try {
       broadcastLeadUpdate({ _id: id, __deleted: true });
@@ -373,5 +456,5 @@ export async function DELETE(req: Request) {
       { success: false, error: err.message },
       { status: 500 }
     );
-}
   }
+}

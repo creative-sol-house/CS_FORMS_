@@ -97,8 +97,12 @@ createdById?: string;
   competitorNamesUrls?: string;
   preferredContactMethod?: string;
   preferredContactTime?: string;
-  agreeToTerms: boolean;
+ 
+      agreeToTerms: boolean;
   subscribeUpdates?: boolean;
+  attachments?: LeadAttachment[];
+  followUps?: FollowUp[]; // <--- Add this here
+
 }
 
 export interface InquiryDoc extends InquiryData {
@@ -113,6 +117,8 @@ export interface InquiryDoc extends InquiryData {
   onsiteAddress?: string;
   auditLogs: AuditLog[];
   submissionLocation?: SubmissionLocation;
+    followUps?: FollowUp[]; // <--- Add this
+
 }
 
 export type Role = "admin" | "business_developer";
@@ -147,4 +153,24 @@ export interface ChatMessage {
   senderRole?: "admin" | "business_developer";
   timestamp: string;
   readBy: string[];
+}
+
+export interface LeadAttachment {
+  _id?: string;
+  url: string;          // Cloudinary secure_url
+  publicId: string;     // For deletion
+  fileName: string;     // Original name
+  fileType: string;     // mime: application/pdf, application/vnd.openxmlformats...
+  fileSize: number;     // bytes
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+export interface FollowUp {
+  _id?: string;
+  date: string; // ISO String
+  note: string;
+  type: "Call" | "Meeting" | "Email" | "Other";
+  loggedBy: string;
+  loggedAt: string;
 }

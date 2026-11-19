@@ -6,7 +6,9 @@ import {
   ClientType,
   RequirementType,
   CommunicationMode,
+  LeadAttachment,
 } from "@/lib/types";
+import FileUpload from "@/components/FileUpload";
 
 const SERVICES: { value: ServiceCategory; label: string; desc: string }[] = [
   { value: "Automation Software", label: "Automation Software", desc: "Bots, integrations, workflow automation" },
@@ -30,7 +32,7 @@ interface Props {
   onSaved: (lead: any) => void;
 }
 
-type Step = 0 | 1 | 2 | 3;
+type Step = 0 | 1 | 2 | 3 | 4;
 
 export default function LeadForm({
   consultantName,
@@ -56,6 +58,10 @@ export default function LeadForm({
     subscribeUpdates: false,
     ...initialData,
   }));
+
+  const [attachments, setAttachments] = useState<LeadAttachment[]>(
+    () => (initialData?.attachments as LeadAttachment[] | undefined) ?? []
+  );
 
   const set = <K extends keyof InquiryData>(k: K, v: InquiryData[K]) =>
     setData((d) => ({ ...d, [k]: v }));
@@ -85,6 +91,7 @@ export default function LeadForm({
     try {
       const body = {
         ...data,
+        attachments, // ← added
         serviceCategory,
         consultantName: isEdit ? data.consultantName || consultantName : consultantName,
         consultantId:  isEdit ? data.consultantId  || consultantId  : consultantId,
@@ -122,79 +129,125 @@ export default function LeadForm({
   }, [step, startingService]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] ring-1 ring-stone-900/5">
+      <div className="relative w-full sm:max-w-3xl bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[94vh] ring-1 ring-stone-900/5">
         {/* Header */}
-        <div className="relative bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-600 px-6 pt-6 pb-5 text-white shrink-0">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-indigo-200">
-                {isEdit ? "Edit Lead" : "New Lead"}
+        <div className="relative bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-600 px-4 sm:px-6 pt-5 sm:pt-6 pb-4 sm:pb-5 text-white shrink-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-indigo-200">
+                {isEdit ? "Edit Lead" : "New Lead"} · Step {step + 1} of {startingService ? 4 : 5}
               </p>
-              <h2 className="text-xl sm:text-2xl font-semibold mt-0.5">
-                {step === 0 ? "What service is this for?" : serviceCategory ?? "Create Lead"}
+              <h2 className="text-lg sm:text-2xl font-semibold mt-0.5 truncate">
+                {step === 0
+                  ? "What service is this for?"
+                  : step === 1
+                  ? "Client details"
+                  : step === 2
+                  ? "Project details"
+                  : step === 3
+                  ? "Extra content"
+                  : "Review & submit"}
               </h2>
-              <p className="text-sm text-indigo-100 mt-1">
-                {step === 0 ? "Pick a category to begin." : `Consultant: ${data.consultantName || consultantName}`}
+              <p className="text-xs sm:text-sm text-indigo-100 mt-1 truncate">
+                {serviceCategory
+                  ? `${serviceCategory} · ${data.consultantName || consultantName}`
+                  : "Pick a category to begin."}
               </p>
             </div>
-            <button onClick={onClose} aria-label="Close" className="rounded-full p-2 hover:bg-white/15 transition-colors">
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="shrink-0 rounded-full p-2 hover:bg-white/15 transition-colors"
+            >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
-          <div className="mt-5 h-1.5 bg-white/20 rounded-full overflow-hidden">
-            <div className="h-full bg-white rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
+          <div className="mt-4 h-1.5 bg-white/20 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-white rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 sm:py-6">
           {step === 0 && (
-            <StepService value={serviceCategory} onChange={(s) => { setServiceCategory(s); setStep(1); }} />
+            <StepService
+              value={serviceCategory}
+              onChange={(s) => {
+                setServiceCategory(s);
+                setStep(1);
+              }}
+            />
           )}
           {step === 1 && <StepClient data={data} set={set} errors={stepErrors} />}
           {step === 2 && serviceCategory && (
-            <StepServiceDetails service={serviceCategory} data={data} set={set} setArray={setArray} />
+            <StepServiceDetails
+              service={serviceCategory}
+              data={data}
+              set={set}
+              setArray={setArray}
+            />
           )}
-          {step === 3 && (
-            <StepReview data={data} service={serviceCategory} consultantName={data.consultantName || consultantName} set={set} />
+          {step === 3 && <StepAttachments value={attachments} onChange={setAttachments} />}
+          {step === 4 && (
+            <StepReview
+              data={data}
+              service={serviceCategory}
+              consultantName={data.consultantName || consultantName}
+              set={set}
+              attachments={attachments}
+            />
           )}
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-stone-200 bg-stone-50 px-6 py-4">
+        <div className="shrink-0 border-t border-stone-200 bg-stone-50 px-4 sm:px-6 py-3 sm:py-4">
           {err && (
-            <div className="mb-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{err}</div>
+            <div className="mb-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+              {err}
+            </div>
           )}
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2">
             <button
-              onClick={() => { if (step === 0) onClose(); else setStep((s) => (s - 1) as Step); }}
-              className="px-4 py-2 text-sm font-semibold text-stone-700 hover:text-stone-900 rounded-lg hover:bg-stone-200/60 transition-colors"
+              onClick={() => {
+                if (step === 0) onClose();
+                else setStep((s) => (s - 1) as Step);
+              }}
+              className="px-3 sm:px-4 py-2 text-sm font-semibold text-stone-700 hover:text-stone-900 rounded-lg hover:bg-stone-200/60 transition-colors"
             >
               {step === 0 ? "Cancel" : "← Back"}
             </button>
 
             <div className="flex items-center gap-2">
-              {step < 3 && (
+              {step < 4 && (
                 <button
                   onClick={() => setStep((s) => (s + 1) as Step)}
                   disabled={step === 1 && !canAdvance}
-                  className="px-5 py-2.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 sm:px-5 py-2.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Continue →
                 </button>
               )}
-              {step === 3 && (
+              {step === 4 && (
                 <button
                   onClick={submit}
                   disabled={saving}
-                  className="px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors flex items-center gap-2"
+                  className="px-4 sm:px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors flex items-center gap-2"
                 >
-                  {saving && <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+                  {saving && (
+                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  )}
                   {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Lead"}
                 </button>
               )}
@@ -217,7 +270,9 @@ function StepService({ value, onChange }: { value?: ServiceCategory; onChange: (
             key={s.value}
             onClick={() => onChange(s.value)}
             className={`group relative text-left p-5 rounded-xl border-2 transition-all duration-200 ${
-              active ? "border-indigo-600 bg-indigo-50/60 shadow-sm" : "border-stone-200 hover:border-indigo-400 hover:bg-indigo-50/30"
+              active
+                ? "border-indigo-600 bg-indigo-50/60 shadow-sm"
+                : "border-stone-200 hover:border-indigo-400 hover:bg-indigo-50/30"
             }`}
           >
             <div className="flex items-start justify-between gap-3">
@@ -225,7 +280,11 @@ function StepService({ value, onChange }: { value?: ServiceCategory; onChange: (
                 <p className="font-semibold text-stone-900 text-sm">{s.label}</p>
                 <p className="text-xs text-stone-500 mt-1 leading-relaxed">{s.desc}</p>
               </div>
-              <span className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${active ? "border-indigo-600 bg-indigo-600" : "border-stone-300 group-hover:border-indigo-400"}`}>
+              <span
+                className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  active ? "border-indigo-600 bg-indigo-600" : "border-stone-300 group-hover:border-indigo-400"
+                }`}
+              >
                 {active && (
                   <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -526,14 +585,30 @@ function MarketingFields({ data, set }: any) {
   );
 }
 
-/* ─────────────── Step 3 ─────────────── */
+/* ─────────────── Step 3 — Attachments ─────────────── */
+function StepAttachments({
+  value, onChange,
+}: { value: LeadAttachment[]; onChange: (v: LeadAttachment[]) => void }) {
+  return (
+    <div className="space-y-5">
+      <SectionHeader
+        title="Extra content"
+        subtitle="Attach PDFs, Word docs, or spreadsheets related to this lead."
+      />
+      <FileUpload attachments={value} onChange={onChange} />
+    </div>
+  );
+}
+
+/* ─────────────── Step 4 — Review ─────────────── */
 function StepReview({
-  data, service, consultantName, set,
+  data, service, consultantName, set, attachments,
 }: {
   data: Partial<InquiryData>;
   service?: ServiceCategory;
   consultantName: string;
   set: <K extends keyof InquiryData>(k: K, v: InquiryData[K]) => void;
+  attachments: LeadAttachment[];
 }) {
   return (
     <div className="space-y-6">
@@ -569,6 +644,7 @@ function StepReview({
           <Summary label="Phone" value={data.phone || "—"} />
           <Summary label="Company" value={data.companyName || "—"} />
           <Summary label="Designation" value={data.designation || "—"} />
+          <Summary label="Attachments" value={`${attachments.length} file(s)`} />
         </dl>
       </div>
     </div>

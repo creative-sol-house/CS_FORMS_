@@ -12,6 +12,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from "recharts";
+import LeadAnalysisPanel from "@/components/LeadAnalysisPanel";
 
 type ServiceFilter =
   | "All"
@@ -662,6 +663,8 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
                   : currentTab === "leads" ? "Total Leads"
                   : currentTab === "users" ? "User Management"
                   : currentTab === "user-analysis" ? "User Analysis"
+                  : currentTab === "lead-analysis" ? "Lead Analysis"
+
                   : "Password Requests"
                 : "My Dashboard"}
             </h1>
@@ -1218,6 +1221,10 @@ const hasUnread = !!(lastMessage && lastMessage.senderRole !== "admin" && !lastM
           <UserAnalysisPanel analysis={analysis} reload={loadAnalysis} onSelectLead={(lead) => setSelected(lead)} />
         )}
 
+{/* --- LEAD ANALYSIS TAB --- */}
+{currentTab === "lead-analysis" && isAdmin && (
+  <LeadAnalysisPanel />
+)}
         {/* --- PASSWORD REQUESTS TAB --- */}
         {currentTab === "password-requests" && isAdmin && (
           <div className="space-y-4">
