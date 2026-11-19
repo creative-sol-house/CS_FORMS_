@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { InquiryDoc, UserDoc } from "@/lib/types";
+import { InquiryDoc, UserDoc, LeadAttachment } from "@/lib/types";
 import CustomSelect from "./CustomSelect";
 
 const STATUS_OPTIONS = ["Interested", "Pending", "Call Back", "Approved", "Not Interested"];
@@ -43,7 +43,6 @@ export default function ManageLeadModal({
   currentUser: string;
   canEdit: boolean;
   canDelete: boolean;
-  /** Opens the full-field LeadForm in edit mode (handled by parent) */
   onEdit: () => void;
 }) {
   const [notes, setNotes] = useState(lead.notes || "");
@@ -68,9 +67,13 @@ export default function ManageLeadModal({
     lead.consultantName ||
     "Unknown";
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
+
+  // Attachments already conform to LeadAttachment — just default to [] if absent
+  const attachments: LeadAttachment[] = useMemo(
+    () => (lead.attachments as LeadAttachment[]) || [],
+    [lead.attachments]
+  );
 
   return (
     <>
@@ -123,18 +126,18 @@ export default function ManageLeadModal({
               </div>
 
               <div className="flex items-center gap-2">
-              {canEdit && (
-  <button
-    onClick={onEdit}
-    className="text-white bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
-    title="Edit all fields"
-  >
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-    </svg>
-    Edit Lead
-  </button>
-)}
+                {canEdit && (
+                  <button
+                    onClick={onEdit}
+                    className="text-white bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    title="Edit all fields"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit Lead
+                  </button>
+                )}
 
                 <button
                   onClick={handlePrint}
@@ -243,6 +246,23 @@ export default function ManageLeadModal({
                   </div>
                 </div>
 
+                {/* ─────────── ATTACHMENTS ─────────── */}
+                {attachments.length > 0 && (
+                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+                    <h3 className="text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                      Attachments ({attachments.length})
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {attachments.map((file, i) => (
+                        <AttachmentCard key={file.publicId || i} file={file} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Activity */}
                 <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
                   <button
@@ -279,11 +299,10 @@ export default function ManageLeadModal({
                   )}
                 </div>
               </div>
+
               {/* RIGHT: CONTROLS */}
               <div className="lg:col-span-4 space-y-5">
                 <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 sticky top-6 space-y-5">
-                  
-                  {/* STATUS - Always editable */}
                   <div>
                     <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-2">Lead Status</label>
                     <CustomSelect
@@ -293,7 +312,6 @@ export default function ManageLeadModal({
                     />
                   </div>
 
-                  {/* ASSIGNMENT - Admin only */}
                   {isAdmin && (
                     <div>
                       <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-2">Assigned To</label>
@@ -305,7 +323,6 @@ export default function ManageLeadModal({
                     </div>
                   )}
 
-                  {/* NOTES - Always editable */}
                   <div className="pt-4 border-t border-stone-100">
                     <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-2">Internal Notes</label>
                     <textarea
@@ -322,8 +339,6 @@ export default function ManageLeadModal({
                       {savingNotes ? "Saving..." : "Save Note"}
                     </button>
                   </div>
-                  
-                  {/* METADATA goes here... */}
                 </div>
               </div>
             </div>
@@ -353,36 +368,243 @@ export default function ManageLeadModal({
 
       {/* ─────────── PRINT-ONLY PAPER FORM (portaled to body) ─────────── */}
       <PrintPortal>
-        <PrintSheet lead={lead} creatorName={creatorName} currentUser={currentUser} />
+        <PrintSheet
+          lead={lead}
+          attachments={attachments}
+          creatorName={creatorName}
+          currentUser={currentUser}
+        />
       </PrintPortal>
     </>
   );
 }
 
-/* ─────────────── Print sheet (professional paper-form layout) ─────────────── */
+function AttachmentCard({ file }: { file: LeadAttachment }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const isImage = file.fileType?.startsWith("image/");
+  const isPdf =
+    file.fileType === "application/pdf" ||
+    file.fileType === "application/pdf" ||
+    file.url?.toLowerCase().endsWith(".pdf");
+  // Files that browsers CAN render inline
+  const canPreviewInline = isImage || isPdf;
+
+  const viewUrl = file.publicId
+    ? `/api/attachments/${encodeURIComponent(file.publicId)}`
+    : file.url || "";
+
+  return (
+    <>
+      <div className="flex items-center gap-3 p-3 rounded-lg border border-stone-200 bg-stone-50/60 hover:bg-stone-100/70 transition-colors group">
+        <div className="w-10 h-10 rounded-lg bg-white border border-stone-200 flex items-center justify-center shrink-0 overflow-hidden">
+          {isImage && file.url ? (
+            <img src={file.url} alt={file.fileName} className="w-full h-full object-cover" />
+          ) : (
+            <FileTypeIcon type={file.fileType} />
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-stone-800 truncate" title={file.fileName}>
+            {file.fileName || "Attachment"}
+          </p>
+          <p className="text-[11px] text-stone-500">
+            {formatBytes(file.fileSize)}
+            {file.fileType ? ` · ${shortType(file.fileType)}` : ""}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+           
+       
+
+          {/* Download — always available */}
+          <a
+            href={viewUrl}
+            download={file.fileName}
+            className="p-1.5 rounded-md text-stone-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+            title="Download"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+            </svg>
+          </a>
+        </div>
+      </div>
+
+      {previewOpen && (
+        <AttachmentPreviewModal file={file} viewUrl={viewUrl} onClose={() => setPreviewOpen(false)} />
+      )}
+    </>
+  );
+}
+
+function AttachmentPreviewModal({
+  file,
+  viewUrl,
+  onClose,
+}: {
+  file: LeadAttachment;
+  viewUrl: string;
+  onClose: () => void;
+}) {
+  const isImage = file.fileType?.startsWith("image/");
+  const isPdf =
+    file.fileType === "application/pdf" || file.url?.toLowerCase().endsWith(".pdf");
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-60 bg-stone-950/80 backdrop-blur-sm flex flex-col"
+      onClick={onClose}
+    >
+      <div
+        className="flex items-center justify-between px-4 py-3 bg-stone-900 text-white shrink-0"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-semibold truncate">{file.fileName}</p>
+          <p className="text-[11px] text-stone-400">{formatBytes(file.fileSize)}</p>
+        </div>
+        <div className="flex items-center gap-2">
+         
+          <a
+            href={viewUrl}
+            download={file.fileName}
+            className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors"
+          >
+            Download
+          </a>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-white/15 transition-colors"
+            aria-label="Close preview"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="flex-1 overflow-auto p-4 flex items-center justify-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {isImage && (
+          <img
+            src={file.url}
+            alt={file.fileName}
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+          />
+        )}
+        {isPdf && (
+          <iframe
+            src={`${viewUrl}#toolbar=1&navpanes=0`}
+            title={file.fileName}
+            className="w-full h-full bg-white rounded-lg shadow-2xl"
+          />
+        )}
+        {!isImage && !isPdf && (
+          <div className="text-center text-white max-w-md">
+            <FileTypeIcon type={file.fileType} size="lg" />
+            <p className="mt-4 text-lg font-semibold">Preview not available</p>
+            <p className="mt-1 text-sm text-stone-300">
+              This file type can't be previewed in the browser. Open or download it instead.
+            </p>
+            <a
+              href={viewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-semibold"
+            >
+              Open in new tab
+            </a>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function IconBtn({ title, onClick, children }: { title: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="p-1.5 rounded-md text-stone-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+    >
+      {children}
+    </button>
+  );
+}
+
+function formatBytes(bytes?: number) {
+  if (!bytes) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0;
+  let n = bytes;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  return `${n.toFixed(n < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
+}
+
+function shortType(mime: string) {
+  if (!mime) return "FILE";
+  if (mime.includes("pdf")) return "PDF";
+  if (mime.includes("word") || mime.includes("doc")) return "DOCX";
+  if (mime.includes("sheet") || mime.includes("excel") || mime.includes("xls")) return "XLSX";
+  if (mime.startsWith("image/")) return mime.split("/")[1].toUpperCase();
+  return "FILE";
+}
+
+function FileTypeIcon({ type, size = "sm" }: { type?: string; size?: "sm" | "lg" }) {
+  const cls = size === "lg" ? "w-16 h-16" : "w-5 h-5";
+  const t = (type || "").toLowerCase();
+  const color = t.includes("pdf")
+    ? "text-rose-500"
+    : t.includes("word") || t.includes("doc")
+    ? "text-blue-500"
+    : t.includes("sheet") || t.includes("excel") || t.includes("xls")
+    ? "text-emerald-500"
+    : "text-stone-400";
+  return (
+    <svg className={`${cls} ${color}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  );
+}
+
+/* ─────────────── Print sheet ─────────────── */
 function PrintSheet({
   lead,
+  attachments,
   creatorName,
   currentUser,
 }: {
   lead: InquiryDoc;
+  attachments: LeadAttachment[];
   creatorName: string;
   currentUser: string;
 }) {
   const sections = buildPrintSections(lead);
+  const imageAttachments = attachments.filter((f) => f.fileType?.startsWith("image/"));
+  const otherAttachments = attachments.filter((f) => !f.fileType?.startsWith("image/"));
 
   return (
     <>
-      {/* Self-contained print CSS */}
       <style>{`
-        #print-area {
-          display: none;
-        }
+        #print-area { display: none; }
         @media print {
-          @page {
-            size: A4 portrait;
-            margin: 14mm 14mm 16mm 14mm;
-          }
+          @page { size: A4 portrait; margin: 14mm 14mm 16mm 14mm; }
           html, body {
             background: #ffffff !important;
             color: #111827 !important;
@@ -392,143 +614,59 @@ function PrintSheet({
             height: auto !important;
             overflow: visible !important;
           }
-          /* Hide everything except the print portal */
-          body > *:not(#print-area) {
-            display: none !important;
-          }
-          #print-area {
-            display: block !important;
-            width: 100% !important;
-          }
-          .pf-container {
-            width: 100%;
-            max-width: 100%;
-          }
+          body > *:not(#print-area) { display: none !important; }
+          #print-area { display: block !important; width: 100% !important; }
+          .pf-container { width: 100%; max-width: 100%; }
           .pf-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            border-bottom: 2px solid #18181b;
-            padding-bottom: 12px;
-            margin-bottom: 16px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+            border-bottom: 2px solid #18181b; padding-bottom: 12px; margin-bottom: 16px;
           }
           .pf-doc-label {
-            font-size: 9px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            color: #52525b;
-            margin-bottom: 3px;
+            font-size: 9px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.12em; color: #52525b; margin-bottom: 3px;
           }
-          .pf-title {
-            font-size: 20px;
-            font-weight: 800;
-            color: #09090b;
-            margin: 0;
-            letter-spacing: -0.02em;
-          }
-          .pf-subtitle {
-            font-size: 11px;
-            color: #52525b;
-            margin-top: 3px;
-          }
+          .pf-title { font-size: 20px; font-weight: 800; color: #09090b; margin: 0; letter-spacing: -0.02em; }
+          .pf-subtitle { font-size: 11px; color: #52525b; margin-top: 3px; }
           .pf-meta-box {
-            border: 1px solid #d4d4d8;
-            background: #fafafa;
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-size: 10.5px;
-            line-height: 1.5;
-            min-width: 195px;
+            border: 1px solid #d4d4d8; background: #fafafa; padding: 8px 12px;
+            border-radius: 4px; font-size: 10.5px; line-height: 1.5; min-width: 195px;
           }
-          .pf-meta-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-          }
-          .pf-meta-key {
-            color: #71717a;
-            font-weight: 600;
-          }
-          .pf-meta-val {
-            color: #18181b;
-            font-weight: 700;
-          }
-          .pf-section {
-            margin-bottom: 14px;
-            break-inside: avoid;
-          }
+          .pf-meta-row { display: flex; justify-content: space-between; gap: 12px; }
+          .pf-meta-key { color: #71717a; font-weight: 600; }
+          .pf-meta-val { color: #18181b; font-weight: 700; }
+          .pf-section { margin-bottom: 14px; break-inside: avoid; }
           .pf-section-header {
-            background: #18181b;
-            color: #ffffff;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            padding: 5px 10px;
+            background: #18181b; color: #ffffff; font-size: 10px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.08em; padding: 5px 10px;
             border-radius: 3px 3px 0 0;
           }
-          .pf-table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: fixed;
+          .pf-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          .pf-table tr { break-inside: avoid; }
+          .pf-table th, .pf-table td {
+            border: 1px solid #d4d4d8; padding: 6px 10px; font-size: 11px;
+            vertical-align: top; text-align: left; word-wrap: break-word;
           }
-          .pf-table tr {
-            break-inside: avoid;
-          }
-          .pf-table th,
-          .pf-table td {
-            border: 1px solid #d4d4d8;
-            padding: 6px 10px;
-            font-size: 11px;
-            vertical-align: top;
-            text-align: left;
-            word-wrap: break-word;
-          }
-          .pf-table th {
-            width: 28%;
-            background: #f4f4f5;
-            color: #3f3f46;
-            font-weight: 600;
-          }
-          .pf-table td {
-            width: 72%;
-            color: #18181b;
-            white-space: pre-wrap;
-          }
+          .pf-table th { width: 28%; background: #f4f4f5; color: #3f3f46; font-weight: 600; }
+          .pf-table td { width: 72%; color: #18181b; white-space: pre-wrap; }
           .pf-notes-box {
-            border: 1px solid #d4d4d8;
-            border-top: none;
-            padding: 10px;
-            font-size: 11px;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            background: #ffffff;
-            min-height: 44px;
+            border: 1px solid #d4d4d8; border-top: none; padding: 10px;
+            font-size: 11px; line-height: 1.5; white-space: pre-wrap;
+            background: #ffffff; min-height: 44px;
           }
+          .pf-attach-image-box {
+            border: 1px solid #d4d4d8; padding: 8px; text-align: center;
+            background: #ffffff; break-inside: avoid;
+          }
+          .pf-attach-image { max-width: 100%; max-height: 380px; object-fit: contain; }
           .pf-signatures {
-            display: flex;
-            justify-content: space-between;
-            gap: 32px;
-            margin-top: 28px;
-            break-inside: avoid;
+            display: flex; justify-content: space-between; gap: 32px;
+            margin-top: 28px; break-inside: avoid;
           }
-          .pf-sign-block {
-            flex: 1;
-          }
-          .pf-sign-line {
-            border-bottom: 1px solid #18181b;
-            height: 28px;
-            margin-bottom: 5px;
-          }
+          .pf-sign-block { flex: 1; }
+          .pf-sign-line { border-bottom: 1px solid #18181b; height: 28px; margin-bottom: 5px; }
           .pf-sign-caption {
-            display: flex;
-            justify-content: space-between;
-            font-size: 9.5px;
-            color: #52525b;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            display: flex; justify-content: space-between; font-size: 9.5px;
+            color: #52525b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
           }
         }
       `}</style>
@@ -566,9 +704,7 @@ function PrintSheet({
               </div>
               <div className="pf-meta-row">
                 <span className="pf-meta-key">Created Date:</span>
-                <span className="pf-meta-val">
-                  {new Date(lead.createdAt).toLocaleDateString()}
-                </span>
+                <span className="pf-meta-val">{new Date(lead.createdAt).toLocaleDateString()}</span>
               </div>
             </div>
           </div>
@@ -587,6 +723,50 @@ function PrintSheet({
                   ))}
                 </tbody>
               </table>
+            </div>
+          ))}
+
+          {/* ATTACHMENTS — reference table (non-image) */}
+          {otherAttachments.length > 0 && (
+            <div className="pf-section">
+              <div className="pf-section-header">Attached Documents ({otherAttachments.length})</div>
+              <table className="pf-table">
+                <thead>
+                  <tr>
+                    <th>File Name</th>
+                    <th style={{ width: "15%" }}>Type</th>
+                    <th style={{ width: "15%" }}>Size</th>
+                    <th style={{ width: "15%" }}>Ref</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {otherAttachments.map((f, i) => (
+                    <tr key={i}>
+                      <td>{f.fileName || "—"}</td>
+                      <td>{shortType(f.fileType || "")}</td>
+                      <td>{formatBytes(f.fileSize) || "—"}</td>
+                      <td style={{ fontSize: 9, wordBreak: "break-all" }}>
+                        {f.publicId ? f.publicId.slice(-8) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ATTACHMENTS — embedded images */}
+          {imageAttachments.map((f, i) => (
+            <div key={i} className="pf-section">
+              <div className="pf-section-header">Image {i + 1}: {f.fileName}</div>
+              <div className="pf-attach-image-box">
+                <img
+                  src={f.url}
+                  alt={f.fileName}
+                  className="pf-attach-image"
+                  crossOrigin="anonymous"
+                />
+              </div>
             </div>
           ))}
 
@@ -638,7 +818,6 @@ function buildPrintSections(lead: InquiryDoc): {
     return { title, rows, add };
   };
 
-  // 1. Client & Contact Information
   const clientSec = makeSection("1. Client & Contact Information");
   clientSec.add("Full Name", lead.fullName);
   clientSec.add("Client Type", lead.clientType);
@@ -650,7 +829,6 @@ function buildPrintSections(lead: InquiryDoc): {
   clientSec.add("Preferred Contact Time", lead.preferredContactTime);
   clientSec.add("Consultant Name", lead.consultantName);
 
-  // 2. Project Overview
   const projectSec = makeSection("2. Project Overview");
   projectSec.add("Requirement Type", lead.requirementType);
   projectSec.add("Service Category", lead.serviceCategory);
@@ -660,7 +838,6 @@ function buildPrintSections(lead: InquiryDoc): {
   projectSec.add("Existing Website", lead.existingWebsite);
   projectSec.add("Additional Client Notes", lead.additionalNotes);
 
-  // 3. Service-Specific Requirements
   const serviceSec = makeSection(`3. ${lead.serviceCategory || "Service"} Specifications`);
 
   if (lead.serviceCategory === "Automation Software") {

@@ -4,70 +4,128 @@ import { connectDB } from "@/lib/mongodb";
 import Inquiry from "@/lib/Inquiry";
 import { verifySession } from "@/lib/auth";
 
+async function getSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("session")?.value;
+  if (!token) return null;
+  try { return verifySession(token); } catch { return null; }
+}
+
+function parseDate(s: string | null, end = false): Date | null {
+  if (!s) return null;
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return null;
+  if (end) d.setHours(23, 59, 59, 999);
+  else d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export async function GET(req: Request) {
-  try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("session")?.value;
-    if (!token) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-    
-    const session = verifySession(token);
-    if (!session) return NextResponse.json({ success: false, error: "Invalid session" }, { status: 401 });
-
-    await connectDB();
-
-    // 1. Fetch all leads (or filter by user if BD)
-    const query = session.role === "admin" 
-      ? {} 
-      : { $or: [{ createdById: session.userId }, { assignedTo: session.name }] };
-
-    const leads = await Inquiry.find(query).lean();
-
-    // 2. KPI Calculations
-    const totalLeads = leads.length;
-    const approved = leads.filter(l => l.status === "Approved").length;
-    const pending = leads.filter(l => l.status === "Pending").length;
-    const notInterested = leads.filter(l => l.status === "Not Interested").length;
-    const conversionRate = totalLeads > 0 ? ((approved / totalLeads) * 100).toFixed(1) : "0.0";
-
-    // 3. Service Breakdown
-    const leadsByService = [
-      { name: "Automation", count: leads.filter(l => l.serviceCategory === "Automation Software").length },
-      { name: "Web Dev", count: leads.filter(l => l.serviceCategory === "Web Development").length },
-      { name: "Logo", count: leads.filter(l => l.serviceCategory === "Logo Design").length },
-      { name: "Marketing", count: leads.filter(l => l.serviceCategory === "Digital Marketing").length },
-    ];
-
-    // 4. Activity Tracking (Follow-ups)
-    const allFollowUps = leads.flatMap(l => l.followUps || []);
-    const calls = allFollowUps.filter(f => f.type === "Call").length;
-    const meetings = allFollowUps.filter(f => f.type === "Meeting").length;
-
-    // 5. Recent Activity (Last 5 follow-ups)
-    const recentActivity = allFollowUps
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 5)
-      .map(f => ({
-        date: f.date,
-        type: f.type,
-        note: f.note,
-        loggedBy: f.loggedBy
-      }));
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        totalLeads,
-        approved,
-        pending,
-        notInterested,
-        conversionRate,
-        leadsByService,
-        calls,
-        meetings,
-        recentActivity,
-      },
-    });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  await connectDB();
+
+  const url = new URL(req.url);
+  const from = parseDate(url.searchParams.get("from"), false);
+  const to = parseDate(url.searchParams.get("to"), true);
+
+  const leadQuery: any =
+    session.role === "admin"
+      ? {}
+      : { $or: [{ assignedTo: session.name }, { createdById: session.userId }] };
+
+  const allLeads = await Inquiry.find(leadQuery).sort({ createdAt: -1 }).lean();
+
+  const inRange = (d?: Date | string | null) => {
+    if (!d) return false;
+    const t = new Date(d).getTime();
+    if (from && t < from.getTime()) return false;
+    if (to && t > to.getTime()) return false;
+    return true;
+  };
+
+  // Counts of each action across ALL in-range logs (for KPI chips etc.)
+  const actionCounts: Record<string, number> = {};
+
+  const scopedLeads = allLeads
+    .map((lead: any) => {
+      const rawLogs: any[] = Array.isArray(lead.auditLogs) ? lead.auditLogs : [];
+      const filteredLogs = from || to ? rawLogs.filter((l) => inRange(l.timestamp)) : rawLogs;
+
+      filteredLogs.forEach((l) => {
+        const a = l.action || "Other";
+        actionCounts[a] = (actionCounts[a] || 0) + 1;
+      });
+
+      return {
+        ...lead,
+        auditLogs: filteredLogs,
+        _matchesRange:
+          !from && !to ? true : inRange(lead.createdAt) || filteredLogs.length > 0,
+      };
+    })
+    .filter((l: any) => l._matchesRange)
+    .map(({ _matchesRange, ...rest }: any) => rest);
+
+  const totalLeads = scopedLeads.length;
+  const approved = scopedLeads.filter((l: any) => l.status === "Approved").length;
+  const conversionRate = totalLeads > 0 ? Math.round((approved / totalLeads) * 100) : 0;
+
+  const byServiceMap: Record<string, number> = {};
+  scopedLeads.forEach((l: any) => {
+    const key = l.serviceCategory || "Unspecified";
+    byServiceMap[key] = (byServiceMap[key] || 0) + 1;
+  });
+  const leadsByService = Object.entries(byServiceMap)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+
+  let calls = 0;
+  let meetings = 0;
+  const recentActivity: any[] = [];
+
+  scopedLeads.forEach((lead: any) => {
+    (lead.auditLogs || []).forEach((log: any) => {
+      const action = (log.action || "").toLowerCase();
+      const details = (log.details || "").toLowerCase();
+      const isCall = action === "call" || details.startsWith("call");
+      const isMeeting = action === "meeting" || details.startsWith("meeting");
+      if (isCall) calls++;
+      if (isMeeting) meetings++;
+      if (isCall || isMeeting) {
+        recentActivity.push({
+          type: isCall ? "Call" : "Meeting",
+          note: log.details,
+          date: log.timestamp,
+          loggedBy: log.performedBy,
+          leadName: lead.fullName,
+          leadId: lead._id,
+        });
+      }
+    });
+  });
+
+  recentActivity.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      totalLeads,
+      approved,
+      conversionRate,
+      calls,
+      meetings,
+      leadsByService,
+      recentActivity: recentActivity.slice(0, 20),
+      actionCounts,
+      leads: scopedLeads,
+      range: {
+        from: from ? from.toISOString() : null,
+        to: to ? to.toISOString() : null,
+      },
+    },
+  });
 }

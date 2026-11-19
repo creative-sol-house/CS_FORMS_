@@ -21,12 +21,12 @@ type ServiceFilter =
   | "Logo Design"
   | "Digital Marketing";
 
-const SERVICE_TABS: { value: ServiceFilter; label: string }[] = [
-  { value: "All", label: "All Services" },
-  { value: "Automation Software", label: "Automation" },
-  { value: "Web Development", label: "Web Dev" },
-  { value: "Logo Design", label: "Logo" },
-  { value: "Digital Marketing", label: "Marketing" },
+const SERVICE_TABS: { value: ServiceFilter; label: string; short: string }[] = [
+  { value: "All", label: "All Services", short: "All" },
+  { value: "Automation Software", label: "Automation", short: "Auto" },
+  { value: "Web Development", label: "Web Dev", short: "Web" },
+  { value: "Logo Design", label: "Logo", short: "Logo" },
+  { value: "Digital Marketing", label: "Marketing", short: "Mktg" },
 ];
 
 const STATUSES = [
@@ -36,6 +36,15 @@ const STATUSES = [
   "Approved",
   "Not Interested",
 ] as const;
+
+function unreadCountFor(lead: InquiryDoc, userName: string): number {
+  const messages = lead.messages || [];
+  return messages.reduce((acc, m) => {
+    if (m.sender === userName) return acc;
+    if (Array.isArray(m.readBy) && m.readBy.includes(userName)) return acc;
+    return acc + 1;
+  }, 0);
+}
 
 export default function AdminClient() {
   const router = useRouter();
@@ -49,72 +58,57 @@ export default function AdminClient() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
+  const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
   const [inquiries, setInquiries] = useState<InquiryDoc[]>([]);
   const [allUsers, setAllUsers] = useState<UserDoc[]>([]);
   const [analysis, setAnalysis] = useState<any[]>([]);
   const [filter, setFilter] = useState<ServiceFilter>("All");
   const [search, setSearch] = useState("");
 
-  // Filters (leads tab)
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [creatorFilter, setCreatorFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [onlyUnread, setOnlyUnread] = useState(false);
 
-  // Filters (BD dashboard)
   const [bdDateFrom, setBdDateFrom] = useState("");
   const [bdDateTo, setBdDateTo] = useState("");
   const [bdServiceFilter, setBdServiceFilter] = useState<ServiceFilter>("All");
   const [bdStatusFilter, setBdStatusFilter] = useState<string>("");
   const [bdOnlyMine, setBdOnlyMine] = useState(false);
+  const [bdOnlyUnread, setBdOnlyUnread] = useState(false);
 
-  // Modals
   const [selected, setSelected] = useState<InquiryDoc | null>(null);
   const [chatLead, setChatLead] = useState<InquiryDoc | null>(null);
-
-  // Add Lead modal
   const [addLeadOpen, setAddLeadOpen] = useState(false);
   const [addLeadService, setAddLeadService] = useState<ServiceCategory | undefined>(undefined);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
 
-  // Forgot Password
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState({ type: "", text: "" });
 
-  // ── DERIVED VALUES (declared before any hook that uses them) ──────────────
   const isAdmin = user?.role === "admin";
   const passwordRequests = allUsers.filter((u) => u.passwordRequest === true);
   const developers = allUsers.filter((u) => u.role === "business_developer");
 
-  // ── PERMISSIONS ───────────────────────────────────────────────────────────
   const canEditLead = (lead: InquiryDoc): boolean => {
     if (!user) return false;
-    
-    // 1. Admin can edit ALL leads
     if (isAdmin) return true;
-
-    // 2. For non-admins (BDs): check ID first, then fallback to Name
     const createdById = (lead as any).createdById as string | undefined;
     const createdBy = (lead as any).createdBy as string | undefined;
     const consultantName = lead.consultantName;
-    
-    // If they created it (either by ID or Name match), they can edit it
     if (createdById && createdById === user.userId) return true;
     if (createdBy && createdBy === user.name) return true;
     if (consultantName && consultantName === user.name) return true;
-
-    // 3. Form-submitted leads (no creator ID/Name at all) → NOT editable
     return false;
   };
 
   const canDeleteLead = (): boolean => isAdmin;
 
-  // ── NAVIGATION & DATA LOADING ──────────────────────────────────────────────
   const setView = async (newView: string) => {
     router.push(`?tab=${newView}`);
     if (newView === "password-requests" || newView === "users") await loadUsers();
@@ -152,11 +146,9 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── SSE REAL-TIME SYNC ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     const es = new EventSource("/api/admin/inquiries/stream");
-
     es.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
@@ -181,13 +173,12 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
           setChatLead((prev) => (prev?._id === lead._id ? lead : prev));
           setSelected((prev) => (prev?._id === lead._id ? lead : prev));
         }
-      } catch (err) {}
+      } catch {}
     };
     return () => es.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // ── API CALLS ──────────────────────────────────────────────────────────────
   const login = async () => {
     setLoading(true);
     setError("");
@@ -308,8 +299,7 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     setInquiries((prev) =>
       prev.map((i) => (i._id === id ? (json.inquiry as InquiryDoc) : i))
     );
-    if (selected && selected._id === id)
-      setSelected(json.inquiry as InquiryDoc);
+    if (selected && selected._id === id) setSelected(json.inquiry as InquiryDoc);
   };
 
   const openChat = async (lead: InquiryDoc) => {
@@ -352,7 +342,6 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     setSelected(null);
   };
 
-  // ── ADD LEAD ──────────────────────────────────────────────────────────────
   const openAddLead = (service?: ServiceCategory) => {
     setAddLeadService(service);
     setAddLeadOpen(true);
@@ -366,15 +355,9 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     setAddLeadOpen(false);
   };
 
-  // ── CREATOR HELPERS ───────────────────────────────────────────────────────
   const getCreatorName = (i: InquiryDoc) => {
     const fromAudit = i.auditLogs?.find((l) => l.action === "Created")?.performedBy;
-    return (
-      (i as any).createdBy ||
-      fromAudit ||
-      i.consultantName ||
-      "Unknown"
-    );
+    return (i as any).createdBy || fromAudit || i.consultantName || "Unknown";
   };
 
   const getCreatorId = (i: InquiryDoc): string | undefined =>
@@ -398,7 +381,6 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     return { label: "Client", cls: "bg-stone-100 text-stone-700 border-stone-200" };
   };
 
-  // ── FILTER HELPERS ────────────────────────────────────────────────────────
   const isInDateRange = (iso: string, from: string, to: string) => {
     const t = new Date(iso).getTime();
     if (from) {
@@ -412,12 +394,12 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     return true;
   };
 
-  // ── LEADS TAB FILTERING ───────────────────────────────────────────────────
   const filtered = useMemo(() => {
     return inquiries.filter((i) => {
       if (filter !== "All" && i.serviceCategory !== filter) return false;
       if (statusFilter && i.status !== statusFilter) return false;
       if (creatorFilter && getCreatorName(i) !== creatorFilter) return false;
+      if (onlyUnread && user && unreadCountFor(i, user.name) === 0) return false;
       if (!isInDateRange(i.createdAt, dateFrom, dateTo)) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -431,7 +413,7 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inquiries, filter, statusFilter, creatorFilter, dateFrom, dateTo, search, allUsers]);
+  }, [inquiries, filter, statusFilter, creatorFilter, dateFrom, dateTo, search, allUsers, onlyUnread, user]);
 
   const activeFiltersCount =
     (filter !== "All" ? 1 : 0) +
@@ -439,7 +421,8 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     (creatorFilter ? 1 : 0) +
     (dateFrom ? 1 : 0) +
     (dateTo ? 1 : 0) +
-    (search ? 1 : 0);
+    (search ? 1 : 0) +
+    (onlyUnread ? 1 : 0);
 
   const clearFilters = () => {
     setFilter("All");
@@ -448,6 +431,7 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     setDateFrom("");
     setDateTo("");
     setSearch("");
+    setOnlyUnread(false);
   };
 
   const creatorOptions = useMemo(() => {
@@ -459,45 +443,38 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     return Array.from(set).sort();
   }, [inquiries]);
 
-  // ── BD DASHBOARD FILTERING ────────────────────────────────────────────────
   const bdFiltered = useMemo(() => {
     return inquiries.filter((i) => {
       if (bdServiceFilter !== "All" && i.serviceCategory !== bdServiceFilter) return false;
       if (bdStatusFilter && i.status !== bdStatusFilter) return false;
-      
-      // FIXED: Check Name fallback here too
+      if (bdOnlyUnread && user && unreadCountFor(i, user.name) === 0) return false;
+
       if (bdOnlyMine) {
         const createdById = (i as any).createdById;
         const createdBy = (i as any).createdBy;
         const consultantName = i.consultantName;
-        const isMine = 
+        const isMine =
           (createdById && createdById === user?.userId) ||
           (createdBy && createdBy === user?.name) ||
           (consultantName && consultantName === user?.name);
-          
         if (!isMine) return false;
       }
-
       if (!isInDateRange(i.createdAt, bdDateFrom, bdDateTo)) return false;
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inquiries, bdServiceFilter, bdStatusFilter, bdOnlyMine, bdDateFrom, bdDateTo, user]);
+  }, [inquiries, bdServiceFilter, bdStatusFilter, bdOnlyMine, bdDateFrom, bdDateTo, bdOnlyUnread, user]);
 
-  // ── BD DASHBOARD SUMMARY (date-filtered) ──────────────────────────────────
   const bdSummary = useMemo(() => {
     const rangeFiltered = inquiries.filter((i) =>
       isInDateRange(i.createdAt, bdDateFrom, bdDateTo)
     );
-    
     return {
       total: rangeFiltered.length,
       assigned: rangeFiltered.filter((i) => i.assignedTo).length,
       approved: rangeFiltered.filter((i) => i.status === "Approved").length,
       pending: rangeFiltered.filter((i) => i.status === "Pending").length,
       notInterested: rangeFiltered.filter((i) => i.status === "Not Interested").length,
-      
-      // FIXED: Check both ID and Name to catch older leads
       createdByMe: rangeFiltered.filter((i) => {
         const createdById = (i as any).createdById;
         const createdBy = (i as any).createdBy;
@@ -516,6 +493,7 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     (bdServiceFilter !== "All" ? 1 : 0) +
     (bdStatusFilter ? 1 : 0) +
     (bdOnlyMine ? 1 : 0) +
+    (bdOnlyUnread ? 1 : 0) +
     (bdDateFrom ? 1 : 0) +
     (bdDateTo ? 1 : 0);
 
@@ -523,9 +501,15 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     setBdServiceFilter("All");
     setBdStatusFilter("");
     setBdOnlyMine(false);
+    setBdOnlyUnread(false);
     setBdDateFrom("");
     setBdDateTo("");
   };
+
+  const totalUnreadLeads = useMemo(
+    () => (user ? inquiries.filter((i) => unreadCountFor(i, user.name) > 0).length : 0),
+    [inquiries, user]
+  );
 
   if (checking)
     return (
@@ -534,17 +518,16 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
       </div>
     );
 
-  // ── LOGIN SCREEN ───────────────────────────────────────────────────────────
   if (!user) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-4 bg-[#fafaf9] text-black">
-        <div className="w-full max-w-100">
-          <div className="flex flex-col items-center mb-9">
-            <h1 className="text-[24px] font-semibold text-black mt-6 tracking-tight">Sign In</h1>
+      <main className="min-h-screen flex items-center justify-center px-4 py-8 bg-[#fafaf9] text-black">
+        <div className="w-full max-w-md">
+          <div className="flex flex-col items-center mb-8">
+            <h1 className="text-2xl font-semibold text-black tracking-tight">Sign In</h1>
             <p className="text-[13px] text-black/60 mt-1.5">Manage client inquiries</p>
           </div>
 
-          <div className="rounded-2xl bg-white border border-stone-200 p-6 space-y-4 shadow-lg shadow-stone-900/5">
+          <div className="rounded-2xl bg-white border border-stone-200 p-5 sm:p-6 space-y-4 shadow-lg shadow-stone-900/5">
             <div>
               <label className="block text-[11px] font-semibold text-black mb-2 uppercase">Email Address</label>
               <input
@@ -641,7 +624,6 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
     );
   }
 
-  // ── MAIN DASHBOARD ─────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen bg-[#fafaf9] text-black">
       {isAdmin && (
@@ -654,42 +636,43 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
         />
       )}
 
-      <main className={`flex-1 w-full ${isAdmin ? "lg:ml-64 ml-0" : ""} p-4 lg:p-8 overflow-x-hidden`}>
-        <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-black tracking-tight">
+      <main className={`flex-1 w-full ${isAdmin ? "lg:ml-64 ml-0" : ""} px-2 sm:px-4 lg:px-6 py-3 lg:py-6 overflow-x-hidden pb-20 lg:pb-6`}>
+        <header className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold text-black tracking-tight truncate">
               {isAdmin
                 ? currentTab === "dashboard" ? "Dashboard Overview"
                   : currentTab === "leads" ? "Total Leads"
                   : currentTab === "users" ? "User Management"
                   : currentTab === "user-analysis" ? "User Analysis"
                   : currentTab === "lead-analysis" ? "Lead Analysis"
-
                   : "Password Requests"
                 : "My Dashboard"}
             </h1>
-            <p className="text-sm text-black/60 mt-1">Manage and track your client inquiries</p>
+            <p className="text-[11px] sm:text-sm text-black/60 mt-0.5">
+              Manage and track your client inquiries
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
             {["dashboard", "leads"].includes(currentTab) && (
               <button
                 onClick={() => openAddLead(undefined)}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm rounded-xl transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[11px] sm:text-sm font-semibold shadow-sm rounded-lg sm:rounded-xl transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
-                Add Lead
+                Add
               </button>
             )}
 
             <div className="relative" ref={settingsRef}>
               <button
                 onClick={() => setSettingsOpen(!settingsOpen)}
-                className="flex items-center gap-3 px-4 py-2 bg-white border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 sm:gap-3 px-1.5 sm:px-3 py-1.5 bg-white border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors shadow-sm"
               >
-                <div className="w-8 h-8 rounded-full bg-stone-900 text-white flex items-center justify-center font-bold text-sm overflow-hidden">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-stone-900 text-white flex items-center justify-center font-bold text-xs sm:text-sm overflow-hidden">
                   {user.profilePicture ? (
                     <img src={user.profilePicture} alt="Me" className="w-full h-full object-cover" />
                   ) : (
@@ -700,7 +683,7 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
                   <p className="text-sm font-semibold text-black leading-tight">{user.name}</p>
                   <p className="text-[10px] text-black/60 uppercase tracking-wider">{user.role.replace("_", " ")}</p>
                 </div>
-                <svg className={`w-4 h-4 text-black/50 transition-transform ${settingsOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className={`w-3.5 h-3.5 text-black/50 transition-transform ${settingsOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
@@ -732,60 +715,55 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
         </header>
 
         {user.passwordRequest && (
-          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-sm">
+          <div className="mb-3 p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs sm:text-sm">
             ⏳ Your password reset request is pending admin approval. A new password will be emailed to you.
           </div>
         )}
 
-        {/* --- ADMIN DASHBOARD --- */}
+        {/* ─── ADMIN DASHBOARD ─── */}
         {currentTab === "dashboard" && isAdmin && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-linear-to-br from-indigo-500 to-indigo-700 p-5 rounded-xl shadow-sm text-white relative overflow-hidden">
-                <div className="absolute -right-4 -top-4 opacity-10">
-                  <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" />
-                  </svg>
-                </div>
-                <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-wider mb-1">Total Leads</p>
-                <p className="text-4xl font-extrabold">{inquiries.length}</p>
-                <p className="text-[10px] text-indigo-200 mt-2 font-medium">All time inquiries</p>
+          <div className="space-y-3 sm:space-y-5 animate-in fade-in duration-300">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+              <div className="bg-linear-to-br from-indigo-500 to-indigo-700 p-3 sm:p-4 rounded-xl shadow-sm text-white relative overflow-hidden">
+                <p className="text-[9px] sm:text-[10px] font-bold text-indigo-100 uppercase tracking-wider mb-1">Total Leads</p>
+                <p className="text-xl sm:text-3xl font-extrabold">{inquiries.length}</p>
+                <p className="text-[9px] text-indigo-200 mt-1 font-medium">All time</p>
               </div>
 
-              <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm">
-                <p className="text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-1">Assigned</p>
-                <p className="text-4xl font-extrabold text-stone-800">{inquiries.filter((i) => i.assignedTo).length}</p>
-                <div className="w-full bg-stone-100 h-1.5 mt-3 rounded-full overflow-hidden">
+              <div className="bg-white p-3 sm:p-4 rounded-xl border border-stone-200 shadow-sm">
+                <p className="text-[9px] sm:text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">Assigned</p>
+                <p className="text-xl sm:text-3xl font-extrabold text-stone-800">{inquiries.filter((i) => i.assignedTo).length}</p>
+                <div className="w-full bg-stone-100 h-1 mt-1.5 rounded-full overflow-hidden">
                   <div className="bg-stone-800 h-full" style={{ width: `${(inquiries.filter((i) => i.assignedTo).length / (inquiries.length || 1)) * 100}%` }}></div>
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm">
-                <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Approved</p>
-                <p className="text-4xl font-extrabold text-stone-800">{inquiries.filter((i) => i.status === "Approved").length}</p>
-                <div className="w-full bg-emerald-100 h-1.5 mt-3 rounded-full overflow-hidden">
+              <div className="bg-white p-3 sm:p-4 rounded-xl border border-stone-200 shadow-sm">
+                <p className="text-[9px] sm:text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Approved</p>
+                <p className="text-xl sm:text-3xl font-extrabold text-stone-800">{inquiries.filter((i) => i.status === "Approved").length}</p>
+                <div className="w-full bg-emerald-100 h-1 mt-1.5 rounded-full overflow-hidden">
                   <div className="bg-emerald-500 h-full" style={{ width: `${(inquiries.filter((i) => i.status === "Approved").length / (inquiries.length || 1)) * 100}%` }}></div>
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm">
-                <p className="text-[11px] font-bold text-rose-600 uppercase tracking-wider mb-1">Not Interested</p>
-                <p className="text-4xl font-extrabold text-stone-800">{inquiries.filter((i) => i.status === "Not Interested").length}</p>
-                <div className="w-full bg-rose-100 h-1.5 mt-3 rounded-full overflow-hidden">
+              <div className="bg-white p-3 sm:p-4 rounded-xl border border-stone-200 shadow-sm">
+                <p className="text-[9px] sm:text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1">Not Interested</p>
+                <p className="text-xl sm:text-3xl font-extrabold text-stone-800">{inquiries.filter((i) => i.status === "Not Interested").length}</p>
+                <div className="w-full bg-rose-100 h-1 mt-1.5 rounded-full overflow-hidden">
                   <div className="bg-rose-500 h-full" style={{ width: `${(inquiries.filter((i) => i.status === "Not Interested").length / (inquiries.length || 1)) * 100}%` }}></div>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white border border-stone-200 p-5 rounded-xl shadow-sm">
-                <div className="flex justify-between items-center mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+              <div className="lg:col-span-2 bg-white border border-stone-200 p-3 sm:p-4 rounded-xl shadow-sm">
+                <div className="flex justify-between items-center mb-3">
                   <div>
-                    <h3 className="text-sm font-bold text-stone-800">Lead Acquisition Trend</h3>
-                    <p className="text-[11px] text-stone-400 mt-0.5">Volume of incoming leads over time</p>
+                    <h3 className="text-xs sm:text-sm font-bold text-stone-800">Lead Acquisition Trend</h3>
+                    <p className="text-[10px] text-stone-400 mt-0.5">Volume over time</p>
                   </div>
                 </div>
-                <div className="h-72 w-full">
+                <div className="h-48 sm:h-64 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={Object.entries(
@@ -795,7 +773,7 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
                           return acc;
                         }, {} as Record<string, number>)
                       ).map(([date, count]) => ({ date, leads: count })).reverse()}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
                     >
                       <defs>
                         <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
@@ -804,18 +782,18 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
-                      <XAxis dataKey="date" tick={{ fill: "#78716c", fontSize: 11 }} axisLine={false} tickLine={false} dy={10} />
-                      <YAxis tick={{ fill: "#78716c", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                      <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e7e5e4", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
-                      <Area type="monotone" dataKey="leads" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorLeads)" />
+                      <XAxis dataKey="date" tick={{ fill: "#78716c", fontSize: 10 }} axisLine={false} tickLine={false} dy={6} />
+                      <YAxis tick={{ fill: "#78716c", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} width={25} />
+                      <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+                      <Area type="monotone" dataKey="leads" stroke="#4f46e5" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLeads)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="bg-white border border-stone-200 p-5 rounded-xl shadow-sm flex flex-col">
-                <h3 className="text-sm font-bold text-stone-800 mb-6">Status Breakdown</h3>
-                <div className="flex-1 min-h-62.5 relative">
+              <div className="bg-white border border-stone-200 p-3 sm:p-4 rounded-xl shadow-sm flex flex-col">
+                <h3 className="text-xs sm:text-sm font-bold text-stone-800 mb-2">Status Breakdown</h3>
+                <div className="flex-1 min-h-44 relative">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -823,25 +801,25 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
                           name: status,
                           value: inquiries.filter((i) => i.status === status).length,
                         })).filter((s) => s.value > 0)}
-                        cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={4} dataKey="value"
+                        cx="50%" cy="50%" innerRadius={45} outerRadius={68} paddingAngle={4} dataKey="value"
                       >
                         {STATUSES.map((_, index) => (
                           <Cell key={index} fill={["#f59e0b", "#4f46e5", "#8b5cf6", "#10b981", "#ef4444"][index]} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ borderRadius: 8, border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
+                      <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-3xl font-extrabold text-stone-800">{inquiries.length}</span>
-                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Total</span>
+                    <span className="text-xl sm:text-2xl font-extrabold text-stone-800">{inquiries.length}</span>
+                    <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider">Total</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-stone-100">
+                <div className="grid grid-cols-2 gap-1 mt-2 pt-2 border-t border-stone-100">
                   {STATUSES.map((status, i) => (
-                    <div key={status} className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ["#f59e0b", "#4f46e5", "#8b5cf6", "#10b981", "#ef4444"][i] }}></div>
-                      <span className="text-[11px] text-stone-600 font-medium">{status}</span>
+                    <div key={status} className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: ["#f59e0b", "#4f46e5", "#8b5cf6", "#10b981", "#ef4444"][i] }}></div>
+                      <span className="text-[10px] text-stone-600 font-medium truncate">{status}</span>
                     </div>
                   ))}
                 </div>
@@ -849,187 +827,280 @@ const [editingLead, setEditingLead] = useState<InquiryDoc | null>(null);
             </div>
 
             <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-stone-200 flex justify-between items-center bg-stone-50/50">
-                <h3 className="text-sm font-bold text-stone-800">Recent Leads</h3>
-                <button onClick={() => setView("leads")} className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wider">View All</button>
+              <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-stone-200 flex justify-between items-center bg-stone-50/50">
+                <h3 className="text-xs sm:text-sm font-bold text-stone-800">Recent Leads</h3>
+                <button onClick={() => setView("leads")} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wider">
+                  View All
+                </button>
               </div>
-              <table className="w-full text-sm text-left">
-                <thead>
-                  <tr className="border-b border-stone-200 bg-white">
-                    <th className="px-5 py-3 font-semibold text-stone-500 text-[10px] uppercase tracking-wider">Client</th>
-                    <th className="px-5 py-3 font-semibold text-stone-500 text-[10px] uppercase tracking-wider">Service</th>
-                    <th className="px-5 py-3 font-semibold text-stone-500 text-[10px] uppercase tracking-wider">Created By</th>
-                    <th className="px-5 py-3 font-semibold text-stone-500 text-[10px] uppercase tracking-wider">Status</th>
-                    <th className="px-5 py-3 font-semibold text-stone-500 text-[10px] uppercase tracking-wider">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {inquiries.slice(0, 5).map((i) => {
-                    const creator = getCreatorName(i);
-                    const role = getCreatorRole(i);
-                    const badge = formatCreatorBadge(role);
-                    return (
-                      <tr key={i._id} className="hover:bg-stone-50 transition-colors">
-                        <td className="px-5 py-3">
-                          <div className="font-semibold text-stone-800 text-[13px]">{i.fullName}</div>
-                          <div className="text-[11px] text-stone-500">{i.email}</div>
-                        </td>
-                        <td className="px-5 py-3 text-[12px] text-stone-700">{i.serviceCategory}</td>
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[12px] text-stone-700 truncate max-w-30">{creator}</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${badge.cls}`}>{badge.label}</span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3">
-                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                            i.status === "Approved" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                            i.status === "Not Interested" ? "bg-rose-50 text-rose-700 border-rose-200" :
-                            i.status === "Interested" ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
-                            "bg-stone-100 text-stone-700 border-stone-200"
-                          }`}>{i.status}</span>
-                        </td>
-                        <td className="px-5 py-3 text-[11px] text-stone-500">{new Date(i.createdAt).toLocaleDateString()}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+
+              <ul className="lg:hidden divide-y divide-stone-100">
+                {inquiries.slice(0, 5).map((i) => {
+                  const creator = getCreatorName(i);
+                  const role = getCreatorRole(i);
+                  const badge = formatCreatorBadge(role);
+                  return (
+                    <li key={i._id} className="px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-xs text-stone-800 truncate">{i.fullName}</p>
+                          <p className="text-[10px] text-stone-500 truncate">{i.email}</p>
+                        </div>
+                        <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider border ${
+                          i.status === "Approved" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                          i.status === "Not Interested" ? "bg-rose-50 text-rose-700 border-rose-200" :
+                          i.status === "Interested" ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
+                          "bg-stone-100 text-stone-700 border-stone-200"
+                        }`}>{i.status}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-stone-500 flex-wrap">
+                        <span className="truncate">{i.serviceCategory}</span>
+                        <span>·</span>
+                        <span className="truncate">{creator}</span>
+                        <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${badge.cls}`}>{badge.label}</span>
+                        <span className="ml-auto">{new Date(i.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <div className="hidden lg:block">
+                <table className="w-full text-sm table-fixed">
+                  <thead>
+                    <tr className="border-b border-stone-200 bg-white">
+                      <th className="w-[32%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Client</th>
+                      <th className="w-[20%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Service</th>
+                      <th className="w-[24%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Created By</th>
+                      <th className="w-[16%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Status</th>
+                      <th className="w-[8%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-right">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {inquiries.slice(0, 5).map((i) => {
+                      const creator = getCreatorName(i);
+                      const role = getCreatorRole(i);
+                      const badge = formatCreatorBadge(role);
+                      return (
+                        <tr key={i._id} className="hover:bg-stone-50 transition-colors">
+                          <td className="px-3 py-2">
+                            <div className="font-semibold text-stone-800 text-[12px] truncate">{i.fullName}</div>
+                            <div className="text-[10px] text-stone-500 truncate">{i.email}</div>
+                          </td>
+                          <td className="px-3 py-2 text-[11px] text-stone-700 truncate">{i.serviceCategory}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="text-[11px] text-stone-700 truncate">{creator}</span>
+                              <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border shrink-0 ${badge.cls}`}>{badge.label}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
+                              i.status === "Approved" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                              i.status === "Not Interested" ? "bg-rose-50 text-rose-700 border-rose-200" :
+                              i.status === "Interested" ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
+                              "bg-stone-100 text-stone-700 border-stone-200"
+                            }`}>{i.status}</span>
+                          </td>
+                          <td className="px-3 py-2 text-[10px] text-stone-500 text-right">{new Date(i.createdAt).toLocaleDateString()}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
 
-        {/* --- BUSINESS DEVELOPER DASHBOARD --- */}
+        {/* ─── BD DASHBOARD ─── */}
         {!isAdmin && currentTab === "dashboard" && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            {/* Filters */}
-            <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3">
+          <div className="space-y-3 sm:space-y-5 animate-in fade-in duration-300">
+            <div className="bg-white border border-stone-200 rounded-xl p-2.5 sm:p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-stone-800">Filters</h3>
+                <h3 className="text-xs sm:text-sm font-bold text-stone-800">Filters</h3>
                 {bdActiveFilters > 0 && (
-                  <button onClick={clearBdFilters} className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wider">
+                  <button onClick={clearBdFilters} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wider">
                     Clear ({bdActiveFilters})
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2">
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 mb-1 uppercase tracking-wider">From</label>
-                  <input type="date" value={bdDateFrom} onChange={(e) => setBdDateFrom(e.target.value)} className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-sm" />
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">From</label>
+                  <input type="date" value={bdDateFrom} onChange={(e) => setBdDateFrom(e.target.value)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px]" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 mb-1 uppercase tracking-wider">To</label>
-                  <input type="date" value={bdDateTo} onChange={(e) => setBdDateTo(e.target.value)} className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-sm" />
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">To</label>
+                  <input type="date" value={bdDateTo} onChange={(e) => setBdDateTo(e.target.value)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px]" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 mb-1 uppercase tracking-wider">Service</label>
-                  <select value={bdServiceFilter} onChange={(e) => setBdServiceFilter(e.target.value as ServiceFilter)} className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-sm bg-white">
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Service</label>
+                  <select value={bdServiceFilter} onChange={(e) => setBdServiceFilter(e.target.value as ServiceFilter)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px] bg-white">
                     {SERVICE_TABS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 mb-1 uppercase tracking-wider">Status</label>
-                  <select value={bdStatusFilter} onChange={(e) => setBdStatusFilter(e.target.value)} className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-sm bg-white">
-                    <option value="">Any status</option>
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Status</label>
+                  <select value={bdStatusFilter} onChange={(e) => setBdStatusFilter(e.target.value)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px] bg-white">
+                    <option value="">Any</option>
                     {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
-              <label className="inline-flex items-center gap-2 text-sm text-stone-700 mt-1 cursor-pointer">
-                <input type="checkbox" checked={bdOnlyMine} onChange={(e) => setBdOnlyMine(e.target.checked)} className="w-4 h-4 accent-indigo-600" />
-                Show only leads I created
-              </label>
-            </div>
 
-            {/* Summary cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-linear-to-br from-indigo-500 to-indigo-700 p-5 rounded-xl shadow-sm text-white">
-                <p className="text-[11px] font-bold text-indigo-100 uppercase tracking-wider mb-1">Total</p>
-                <p className="text-4xl font-extrabold">{bdSummary.total}</p>
-                <p className="text-[10px] text-indigo-200 mt-2 font-medium">Leads in range</p>
-              </div>
-              <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm">
-                <p className="text-[11px] font-bold text-blue-600 uppercase tracking-wider mb-1">Created by me</p>
-                <p className="text-4xl font-extrabold text-stone-800">{bdSummary.createdByMe}</p>
-                <p className="text-[10px] text-stone-500 mt-2">Leads I added</p>
-              </div>
-              <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm">
-                <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Approved</p>
-                <p className="text-4xl font-extrabold text-stone-800">{bdSummary.approved}</p>
-                <p className="text-[10px] text-stone-500 mt-2">Closed won</p>
-              </div>
-              <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm">
-                <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider mb-1">Pending</p>
-                <p className="text-4xl font-extrabold text-stone-800">{bdSummary.pending}</p>
-                <p className="text-[10px] text-stone-500 mt-2">Awaiting action</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-1.5 text-[11px] text-stone-700 cursor-pointer">
+                  <input type="checkbox" checked={bdOnlyMine} onChange={(e) => setBdOnlyMine(e.target.checked)} className="w-3.5 h-3.5 accent-indigo-600" />
+                  Mine
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setBdOnlyUnread((v) => !v)}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-colors ${
+                    bdOnlyUnread
+                      ? "bg-rose-600 text-white border-rose-600"
+                      : "bg-white text-stone-700 border-stone-300 hover:bg-stone-50"
+                  }`}
+                >
+                  <svg className={`w-3 h-3 ${bdOnlyUnread ? "text-white" : "text-rose-600"}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  Unread
+                </button>
               </div>
             </div>
 
-            {/* Leads table */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+              <div className="bg-linear-to-br from-indigo-500 to-indigo-700 p-3 rounded-xl shadow-sm text-white">
+                <p className="text-[9px] sm:text-[10px] font-bold text-indigo-100 uppercase tracking-wider mb-0.5">Total</p>
+                <p className="text-xl sm:text-3xl font-extrabold">{bdSummary.total}</p>
+                <p className="text-[9px] text-indigo-200 mt-0.5">In range</p>
+              </div>
+              <div className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm">
+                <p className="text-[9px] sm:text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-0.5">Mine</p>
+                <p className="text-xl sm:text-3xl font-extrabold text-stone-800">{bdSummary.createdByMe}</p>
+                <p className="text-[9px] text-stone-500 mt-0.5">I created</p>
+              </div>
+              <div className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm">
+                <p className="text-[9px] sm:text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-0.5">Approved</p>
+                <p className="text-xl sm:text-3xl font-extrabold text-stone-800">{bdSummary.approved}</p>
+                <p className="text-[9px] text-stone-500 mt-0.5">Won</p>
+              </div>
+              <div className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm">
+                <p className="text-[9px] sm:text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-0.5">Pending</p>
+                <p className="text-xl sm:text-3xl font-extrabold text-stone-800">{bdSummary.pending}</p>
+                <p className="text-[9px] text-stone-500 mt-0.5">Awaiting</p>
+              </div>
+            </div>
+
             <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-175">
+              <ul className="lg:hidden divide-y divide-stone-100">
+                {bdFiltered.length === 0 ? (
+                  <li className="px-3 py-6 text-center text-xs text-black/50">No leads match these filters.</li>
+                ) : bdFiltered.map((i) => {
+                  const creator = getCreatorName(i);
+                  const role = getCreatorRole(i);
+                  const badge = formatCreatorBadge(role);
+                  const unread = user ? unreadCountFor(i, user.name) : 0;
+                  return (
+                    <li key={i._id} className="px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-xs text-stone-800 truncate">{i.fullName}</p>
+                          <p className="text-[10px] text-stone-500 truncate">{i.email}</p>
+                        </div>
+                        {unread > 0 && (
+                          <span className="shrink-0 min-w-[18px] h-4.5 px-1 flex items-center justify-center rounded-full bg-rose-600 text-white text-[9px] font-bold">
+                            {unread}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-stone-500 flex-wrap">
+                        <span className="truncate">{creator}</span>
+                        <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${badge.cls}`}>{badge.label}</span>
+                        <span>·</span>
+                        <span className="truncate">{i.serviceCategory || "General"}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <select
+                          value={i.status}
+                          onChange={(e) => updateLead(i._id, { status: e.target.value })}
+                          className="text-[10px] border border-stone-200 rounded-md p-1 bg-white flex-1 min-w-0"
+                        >
+                          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <IconButton label="Chat" onClick={() => openChat(i)} badge={unread > 0}>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                          </svg>
+                        </IconButton>
+                        <IconButton label="View" onClick={() => setSelected(i)}>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </IconButton>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <div className="hidden lg:block">
+                <table className="w-full text-sm table-fixed">
                   <thead>
                     <tr className="bg-stone-50 border-b border-stone-200 text-left">
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Client</th>
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Created By</th>
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Status</th>
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Service</th>
-                      <th className="px-5 py-3"></th>
+                      <th className="w-[32%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
+                      <th className="w-[22%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Created By</th>
+                      <th className="w-[20%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Status</th>
+                      <th className="w-[16%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Service</th>
+                      <th className="w-[10%] px-3 py-2"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {bdFiltered.length === 0 ? (
-                      <tr><td colSpan={5} className="px-5 py-8 text-center text-black/50">No leads match these filters.</td></tr>
+                      <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-black/50">No leads match these filters.</td></tr>
                     ) : bdFiltered.map((i) => {
                       const creator = getCreatorName(i);
                       const role = getCreatorRole(i);
                       const badge = formatCreatorBadge(role);
-                      const editable = canEditLead(i);
-                      const lastMessage = i.messages && i.messages.length > 0 ? i.messages[i.messages.length - 1] : null;
-const hasUnread = !!(lastMessage && lastMessage.senderRole !== "admin" && !lastMessage.readBy?.includes(user.userId));
+                      const unread = user ? unreadCountFor(i, user.name) : 0;
                       return (
                         <tr key={i._id} className="hover:bg-stone-50/50">
-                          <td className="px-5 py-3">
-                            <div className="font-medium text-black">{i.fullName}</div>
-                            <div className="text-xs text-black/50">{i.email}</div>
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-black text-[12px] truncate">{i.fullName}</div>
+                            <div className="text-[10px] text-black/50 truncate">{i.email}</div>
                           </td>
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[12px] text-stone-700 truncate max-w-30">{creator}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${badge.cls}`}>{badge.label}</span>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="text-[11px] text-stone-700 truncate">{creator}</span>
+                              <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border shrink-0 ${badge.cls}`}>{badge.label}</span>
                             </div>
                           </td>
-                          <td className="px-5 py-3">
+                          <td className="px-3 py-2">
                             <select
                               value={i.status}
                               onChange={(e) => updateLead(i._id, { status: e.target.value })}
-                              className="text-xs border border-stone-200 rounded-lg p-1 bg-white"
+                              className="w-full text-[10px] border border-stone-200 rounded-md p-1 bg-white"
                             >
                               {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                             </select>
                           </td>
-                          <td className="px-5 py-3 text-xs text-black/70">{i.serviceCategory || "General"}</td>
-                          <td className="px-5 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <IconButton label="Chat" onClick={() => openChat(i)} badge={hasUnread}>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <td className="px-3 py-2 text-[11px] text-black/70 truncate">{i.serviceCategory || "General"}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center justify-end gap-1">
+                              <IconButton label="Chat" onClick={() => openChat(i)} badge={unread > 0}>
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
                               </IconButton>
                               <IconButton label="View" onClick={() => setSelected(i)}>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
                               </IconButton>
-                              {editable && (
-                                <IconButton label="Edit" onClick={() => setSelected(i)}>
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </IconButton>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -1042,159 +1113,232 @@ const hasUnread = !!(lastMessage && lastMessage.senderRole !== "admin" && !lastM
           </div>
         )}
 
-        {/* --- TOTAL LEADS TAB --- */}
+        {/* ─── TOTAL LEADS TAB ─── */}
         {currentTab === "leads" && (
-          <div className="space-y-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-center gap-2">
+          <div className="space-y-2 sm:space-y-3">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <input
-                  className="flex-1 min-w-[220px] px-3 py-2 border border-stone-300 rounded-xl text-sm text-black focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-                  placeholder="Search by name, email, phone..."
+                  className="flex-1 min-w-[140px] px-2.5 py-1.5 border border-stone-300 rounded-lg text-xs sm:text-sm text-black focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                  placeholder="Search…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
+                <button
+                  type="button"
+                  onClick={() => setOnlyUnread((v) => !v)}
+                  aria-pressed={onlyUnread}
+                  className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors ${
+                    onlyUnread
+                      ? "bg-rose-600 text-white border-rose-600 shadow-sm"
+                      : "bg-white text-stone-700 border-stone-300 hover:bg-stone-50"
+                  }`}
+                >
+                  <svg className={`w-3.5 h-3.5 ${onlyUnread ? "text-white" : "text-rose-600"}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  Unread
+                  {totalUnreadLeads > 0 && (
+                    <span className={`text-[9px] font-bold min-w-[16px] text-center px-1 py-0.5 rounded-full ${onlyUnread ? "bg-white/25 text-white" : "bg-rose-600 text-white"}`}>
+                      {totalUnreadLeads}
+                    </span>
+                  )}
+                </button>
                 {activeFiltersCount > 0 && (
-                  <button onClick={clearFilters} className="px-3 py-2 text-xs font-semibold text-stone-600 hover:text-stone-900 border border-stone-300 rounded-xl hover:bg-stone-50">
-                    Clear filters ({activeFiltersCount})
+                  <button onClick={clearFilters} className="px-2 py-1.5 text-[11px] font-semibold text-stone-600 hover:text-stone-900 border border-stone-300 rounded-lg hover:bg-stone-50">
+                    Clear ({activeFiltersCount})
                   </button>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white border border-stone-200 rounded-xl p-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2 bg-white border border-stone-200 rounded-lg p-2">
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 mb-1 uppercase tracking-wider">From date</label>
-                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-sm" />
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">From</label>
+                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 mb-1 uppercase tracking-wider">To date</label>
-                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-sm" />
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">To</label>
+                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 mb-1 uppercase tracking-wider">Created by</label>
-                  <select value={creatorFilter} onChange={(e) => setCreatorFilter(e.target.value)} className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-sm bg-white">
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Created by</label>
+                  <select value={creatorFilter} onChange={(e) => setCreatorFilter(e.target.value)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs bg-white">
                     <option value="">Anyone</option>
                     {creatorOptions.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 mb-1 uppercase tracking-wider">Status</label>
-                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-sm bg-white">
-                    <option value="">Any status</option>
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Status</label>
+                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs bg-white">
+                    <option value="">Any</option>
                     {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center border-b border-stone-200">
+              <div className="flex items-center gap-0.5 border-b border-stone-200 overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
                 {SERVICE_TABS.map((tab) => (
                   <button
                     key={tab.value}
                     onClick={() => setFilter(tab.value)}
-                    className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                    className={`shrink-0 px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-medium transition-colors border-b-2 whitespace-nowrap ${
                       filter === tab.value ? "border-indigo-600 text-indigo-700" : "border-transparent text-black/60 hover:text-black hover:border-stone-300"
                     }`}
                   >
-                    {tab.label}
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className="sm:hidden">{tab.short}</span>
                   </button>
                 ))}
-                <button
-                  onClick={() => openAddLead(filter === "All" ? undefined : (filter as ServiceCategory))}
-                  className="ml-auto mb-1 flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add {filter === "All" ? "Lead" : filter.split(" ")[0]}
-                </button>
               </div>
             </div>
 
-            <div className="text-xs text-stone-500">
+            <div className="text-[10px] sm:text-[11px] text-stone-500">
               Showing {filtered.length} of {inquiries.length} lead{inquiries.length !== 1 ? "s" : ""}
             </div>
 
-            <div className="bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-200">
+            <div className="bg-white border border-stone-200 rounded-lg shadow-sm overflow-hidden">
+              {/* Mobile cards */}
+              <ul className="lg:hidden divide-y divide-stone-100">
+                {filtered.length === 0 ? (
+                  <li className="px-3 py-6 text-center text-xs text-black/50">No leads match these filters.</li>
+                ) : filtered.map((i) => {
+                  const creator = getCreatorName(i);
+                  const role = getCreatorRole(i);
+                  const badge = formatCreatorBadge(role);
+                  const unread = user ? unreadCountFor(i, user.name) : 0;
+                  return (
+                    <li key={i._id} className="px-2.5 py-2">
+                      <div className="flex items-start justify-between gap-1.5">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-[11px] text-stone-800 truncate">{i.fullName}</p>
+                          <p className="text-[9px] text-stone-500 truncate">{i.email}</p>
+                        </div>
+                        {unread > 0 && (
+                          <span className="shrink-0 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-rose-600 text-white text-[8px] font-bold">
+                            {unread}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 mt-0.5 text-[9px] text-stone-500 flex-wrap">
+                        <span className="truncate">{creator}</span>
+                        <span className={`px-0.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider border ${badge.cls}`}>{badge.label}</span>
+                        <span>·</span>
+                        <span className="truncate">{i.serviceCategory || "General"}</span>
+                        {i.assignedTo && <span className="truncate ml-auto">→ {i.assignedTo}</span>}
+                      </div>
+                      <div className="flex items-center gap-1 mt-1.5">
+                        <select
+                          value={i.status}
+                          onChange={(e) => updateLead(i._id, { status: e.target.value })}
+                          className="text-[9px] border border-stone-200 rounded p-0.5 bg-white flex-1 min-w-0"
+                        >
+                          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <IconButton label="Chat" onClick={() => openChat(i)} badge={unread > 0}>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                          </svg>
+                        </IconButton>
+                        <IconButton label="View" onClick={() => setSelected(i)}>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </IconButton>
+                        {canDeleteLead() && (
+                          <IconButton label="Delete" variant="danger" onClick={() => remove(i._id)}>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </IconButton>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {/* Desktop table — table-fixed, no overflow */}
+              <div className="hidden lg:block">
+                <table className="w-full text-sm table-fixed">
                   <thead>
                     <tr className="bg-stone-50 border-b border-stone-200 text-left">
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Client</th>
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Created By</th>
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Status</th>
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Assigned To</th>
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Service</th>
-                      <th className="px-5 py-3"></th>
+                      <th className="w-[26%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
+                      <th className="w-[18%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Created By</th>
+                      <th className="w-[14%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Status</th>
+                      <th className="w-[16%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Assigned</th>
+                      <th className="w-[14%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Service</th>
+                      <th className="w-[12%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {filtered.length === 0 ? (
-                      <tr><td colSpan={6} className="px-5 py-8 text-center text-black/50">No leads match these filters.</td></tr>
+                      <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-black/50">No leads match these filters.</td></tr>
                     ) : filtered.map((i) => {
                       const creator = getCreatorName(i);
                       const role = getCreatorRole(i);
                       const badge = formatCreatorBadge(role);
                       const editable = canEditLead(i);
-                      const lastMessage = i.messages && i.messages.length > 0 ? i.messages[i.messages.length - 1] : null;
-                      const hasUnread = !!(lastMessage && lastMessage.senderRole !== "admin" && !lastMessage.readBy?.includes(user.userId));
+                      const unread = user ? unreadCountFor(i, user.name) : 0;
                       return (
                         <tr key={i._id} className="hover:bg-stone-50/50">
-                          <td className="px-5 py-3">
-                            <div className="font-medium text-black">{i.fullName}</div>
-                            <div className="text-xs text-black/50">{i.email}</div>
+                          <td className="px-2.5 py-2 min-w-0">
+                            <div className="font-medium text-black text-[12px] truncate">{i.fullName}</div>
+                            <div className="text-[10px] text-black/50 truncate">{i.email}</div>
                           </td>
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[12px] text-stone-700 truncate max-w-30">{creator}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${badge.cls}`}>{badge.label}</span>
+                          <td className="px-2.5 py-2 min-w-0">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="text-[11px] text-stone-700 truncate">{creator}</span>
+                              <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border shrink-0 ${badge.cls}`}>{badge.label}</span>
                             </div>
                           </td>
-                          <td className="px-5 py-3">
+                          <td className="px-2.5 py-2">
                             <select
                               value={i.status}
                               onChange={(e) => updateLead(i._id, { status: e.target.value })}
-                              className="text-xs border border-stone-200 rounded-lg p-1 bg-white"
+                              className="w-full text-[10px] border border-stone-200 rounded p-1 bg-white"
                             >
                               {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                             </select>
                           </td>
-                          <td className="px-5 py-3">
+                          <td className="px-2.5 py-2 min-w-0">
                             {isAdmin ? (
                               <select
                                 value={i.assignedTo || ""}
                                 onChange={(e) => updateLead(i._id, { assignedTo: e.target.value })}
-                                className="text-xs border border-stone-200 rounded-lg p-1 bg-white"
+                                className="w-full text-[10px] border border-stone-200 rounded p-1 bg-white"
                               >
                                 <option value="">Unassigned</option>
                                 {developers.map((d) => <option key={d._id} value={d.name}>{d.name}</option>)}
                               </select>
                             ) : (
-                              <span className="text-xs text-black/70">{i.assignedTo || "Unassigned"}</span>
+                              <span className="text-[10px] text-black/70 truncate block">{i.assignedTo || "—"}</span>
                             )}
                           </td>
-                          <td className="px-5 py-3 text-xs text-black/70">{i.serviceCategory || "General"}</td>
-                          <td className="px-5 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <IconButton label="Chat" onClick={() => openChat(i)} badge={hasUnread}>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <td className="px-2.5 py-2 text-[11px] text-black/70 truncate">{i.serviceCategory || "General"}</td>
+                          <td className="px-2.5 py-2">
+                            <div className="flex items-center justify-end gap-0.5">
+                              <IconButton label="Chat" onClick={() => openChat(i)} badge={unread > 0}>
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
                               </IconButton>
                               <IconButton label="View" onClick={() => setSelected(i)}>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
                               </IconButton>
                               {editable && (
                                 <IconButton label="Edit" onClick={() => setSelected(i)}>
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                   </svg>
                                 </IconButton>
                               )}
                               {canDeleteLead() && (
                                 <IconButton label="Delete" variant="danger" onClick={() => remove(i._id)}>
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                   </svg>
                                 </IconButton>
@@ -1211,70 +1355,102 @@ const hasUnread = !!(lastMessage && lastMessage.senderRole !== "admin" && !lastM
           </div>
         )}
 
-        {/* --- USERS TAB --- */}
         {currentTab === "users" && isAdmin && (
           <UsersPanel currentUserId={user.userId} users={allUsers} reload={loadUsers} />
         )}
 
-        {/* --- USER ANALYSIS TAB --- */}
         {currentTab === "user-analysis" && isAdmin && (
           <UserAnalysisPanel analysis={analysis} reload={loadAnalysis} onSelectLead={(lead) => setSelected(lead)} />
         )}
 
-{/* --- LEAD ANALYSIS TAB --- */}
-{currentTab === "lead-analysis" && isAdmin && (
-  <LeadAnalysisPanel />
-)}
-        {/* --- PASSWORD REQUESTS TAB --- */}
+        {currentTab === "lead-analysis" && isAdmin && (
+          <LeadAnalysisPanel />
+        )}
+
         {currentTab === "password-requests" && isAdmin && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-black">Password Reset Requests</h2>
+          <div className="space-y-3">
+            <h2 className="text-base sm:text-lg font-semibold text-black">Password Reset Requests</h2>
             {passwordRequests.length === 0 ? (
               <p className="text-sm text-black/50">No pending password reset requests.</p>
             ) : (
               <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
-                <table className="w-full text-sm text-left">
-                  <thead>
-                    <tr className="bg-stone-50 border-b border-stone-200">
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Name</th>
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Email</th>
-                      <th className="px-5 py-3 font-semibold text-black text-[11px] uppercase tracking-wider">Requested At</th>
-                      <th className="px-5 py-3"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {passwordRequests.map((u) => (
-                      <tr key={u._id} className="hover:bg-stone-50/50">
-                        <td className="px-5 py-3 font-medium text-black">{u.name}</td>
-                        <td className="px-5 py-3 text-black/70">{u.email}</td>
-                        <td className="px-5 py-3 text-black/50 text-xs">{u.requestDate ? new Date(u.requestDate).toLocaleString() : "N/A"}</td>
-                        <td className="px-5 py-3 text-right">
-                          <button
-                            onClick={async () => {
-                              const newPass = prompt(`Enter new temporary password for ${u.name}:`);
-                              if (!newPass) return;
-                              const res = await fetch(`/api/admin/users/${u._id}/reset-password`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ password: newPass }),
-                              });
-                              const json = await res.json();
-                              if (json.success) {
-                                alert("Password reset successfully and emailed to user.");
-                                await loadUsers();
-                              } else {
-                                alert("Failed: " + json.error);
-                              }
-                            }}
-                            className="px-3 py-1.5 bg-indigo-600 text-white font-semibold text-xs rounded-lg hover:bg-indigo-700"
-                          >
-                            Reset Password
-                          </button>
-                        </td>
+                <ul className="lg:hidden divide-y divide-stone-100">
+                  {passwordRequests.map((u) => (
+                    <li key={u._id} className="px-3 py-2.5">
+                      <p className="font-semibold text-xs text-stone-800 truncate">{u.name}</p>
+                      <p className="text-[10px] text-stone-500 truncate">{u.email}</p>
+                      <p className="text-[9px] text-stone-500 mt-0.5">
+                        {u.requestDate ? new Date(u.requestDate).toLocaleString() : "N/A"}
+                      </p>
+                      <button
+                        onClick={async () => {
+                          const newPass = prompt(`Enter new temporary password for ${u.name}:`);
+                          if (!newPass) return;
+                          const res = await fetch(`/api/admin/users/${u._id}/reset-password`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ password: newPass }),
+                          });
+                          const json = await res.json();
+                          if (json.success) {
+                            alert("Password reset successfully and emailed to user.");
+                            await loadUsers();
+                          } else {
+                            alert("Failed: " + json.error);
+                          }
+                        }}
+                        className="mt-1.5 w-full py-1.5 bg-indigo-600 text-white font-semibold text-[10px] rounded-lg hover:bg-indigo-700"
+                      >
+                        Reset Password
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="hidden lg:block">
+                  <table className="w-full text-sm table-fixed">
+                    <thead>
+                      <tr className="bg-stone-50 border-b border-stone-200">
+                        <th className="w-[25%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider text-left">Name</th>
+                        <th className="w-[35%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider text-left">Email</th>
+                        <th className="w-[25%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider text-left">Requested</th>
+                        <th className="w-[15%] px-3 py-2 text-right"></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {passwordRequests.map((u) => (
+                        <tr key={u._id} className="hover:bg-stone-50/50">
+                          <td className="px-3 py-2 font-medium text-black text-[12px] truncate">{u.name}</td>
+                          <td className="px-3 py-2 text-black/70 text-[11px] truncate">{u.email}</td>
+                          <td className="px-3 py-2 text-black/50 text-[10px] truncate">{u.requestDate ? new Date(u.requestDate).toLocaleString() : "N/A"}</td>
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              onClick={async () => {
+                                const newPass = prompt(`Enter new temporary password for ${u.name}:`);
+                                if (!newPass) return;
+                                const res = await fetch(`/api/admin/users/${u._id}/reset-password`, {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ password: newPass }),
+                                });
+                                const json = await res.json();
+                                if (json.success) {
+                                  alert("Password reset successfully and emailed to user.");
+                                  await loadUsers();
+                                } else {
+                                  alert("Failed: " + json.error);
+                                }
+                              }}
+                              className="px-2 py-1 bg-indigo-600 text-white font-semibold text-[10px] rounded-md hover:bg-indigo-700 whitespace-nowrap"
+                            >
+                              Reset
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -1282,40 +1458,39 @@ const hasUnread = !!(lastMessage && lastMessage.senderRole !== "admin" && !lastM
       </main>
 
       {selected && (
-  <ManageLeadModal
-    lead={selected}
-    onClose={() => setSelected(null)}
-    onUpdate={(updates) => updateLead(selected._id, updates)}
-    onDelete={() => remove(selected._id)}
-    developers={developers}
-    isAdmin={isAdmin}
-    currentUser={user.name}
-    canEdit={canEditLead(selected)}
-    canDelete={canDeleteLead()}
-    onEdit={() => {
-      setEditingLead(selected);
-      setSelected(null);
-    }}
-  />
-)}
+        <ManageLeadModal
+          lead={selected}
+          onClose={() => setSelected(null)}
+          onUpdate={(updates) => updateLead(selected._id, updates)}
+          onDelete={() => remove(selected._id)}
+          developers={developers}
+          isAdmin={isAdmin}
+          currentUser={user.name}
+          canEdit={canEditLead(selected)}
+          canDelete={canDeleteLead()}
+          onEdit={() => {
+            setEditingLead(selected);
+            setSelected(null);
+          }}
+        />
+      )}
 
-{/* NEW: full-field edit form */}
-{editingLead && (
-  <LeadForm
-    consultantName={user.name}
-    consultantId={user.userId}
-    leadId={editingLead._id}
-    lockedService={editingLead.serviceCategory}
-    initialData={editingLead}
-    onClose={() => setEditingLead(null)}
-    onSaved={(updated) => {
-      setInquiries((prev) =>
-        prev.map((i) => (i._id === updated._id ? updated : i))
-      );
-      setEditingLead(null);
-    }}
-  />
-)}
+      {editingLead && (
+        <LeadForm
+          consultantName={user.name}
+          consultantId={user.userId}
+          leadId={editingLead._id}
+          lockedService={editingLead.serviceCategory}
+          initialData={editingLead}
+          onClose={() => setEditingLead(null)}
+          onSaved={(updated) => {
+            setInquiries((prev) =>
+              prev.map((i) => (i._id === updated._id ? updated : i))
+            );
+            setEditingLead(null);
+          }}
+        />
+      )}
 
       {chatLead && (
         <ChatModal
@@ -1340,9 +1515,7 @@ const hasUnread = !!(lastMessage && lastMessage.senderRole !== "admin" && !lastM
   );
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
-   IconButton — small, cute, tooltip on hover
-   ──────────────────────────────────────────────────────────────────────────── */
+/* ── IconButton ── */
 function IconButton({
   children,
   label,
@@ -1357,7 +1530,7 @@ function IconButton({
   variant?: "default" | "danger";
 }) {
   const base =
-    "relative inline-flex items-center justify-center w-8 h-8 rounded-lg border transition-all duration-150 active:scale-95";
+    "relative inline-flex items-center justify-center w-7 h-7 sm:w-7 sm:h-7 rounded-md border transition-all duration-150 active:scale-95 shrink-0";
   const colors =
     variant === "danger"
       ? "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100"
@@ -1366,7 +1539,7 @@ function IconButton({
     <button onClick={onClick} title={label} aria-label={label} className={`${base} ${colors}`}>
       {children}
       {badge && (
-        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse" />
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white animate-pulse" />
       )}
     </button>
   );
