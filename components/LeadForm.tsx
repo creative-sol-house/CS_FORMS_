@@ -380,9 +380,13 @@ function AutomationFields({ data, set, setArray }: any) {
             <TextArea value={data.projectGoals || ""} onChange={(v) => set("projectGoals", v)} placeholder="What should this automation achieve?" />
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Target audience">
-              <TextInput value={data.targetAudience || ""} onChange={(v) => set("targetAudience", v)} />
-            </Field>
+           <Field label="Number Of Users">
+  <TextInput
+    value={data.targetAudience || ""}
+    onChange={(v) => set("targetAudience", v.replace(/[^0-9]/g, ""))}
+    placeholder="Enter number of users"
+  />
+</Field>
             <Field label="Existing website">
               <TextInput value={data.existingWebsite || ""} onChange={(v) => set("existingWebsite", v)} placeholder="https://…" />
             </Field>
@@ -462,9 +466,13 @@ function WebDevFields({ data, set }: any) {
           <Field label="Project goals">
             <TextArea value={data.projectGoals || ""} onChange={(v) => set("projectGoals", v)} />
           </Field>
-          <Field label="Target audience">
-            <TextInput value={data.targetAudience || ""} onChange={(v) => set("targetAudience", v)} />
-          </Field>
+        <Field label="Number Of Users">
+  <TextInput
+    value={data.targetAudience || ""}
+    onChange={(v) => set("targetAudience", v.replace(/[^0-9]/g, ""))}
+    placeholder="Enter number of users"
+  />
+</Field>
         </div>
       </div>
       <div>

@@ -59,13 +59,20 @@ export default function Step3Project({ data, update, next, back }: Props) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Number Of Users" required>
-            <input
-              className={inputBase}
-              placeholder="Enter Numeric Value"
-              value={data.targetAudience || ""}
-              onChange={(e) => update({ targetAudience: e.target.value })}
-            />
-          </Field>
+  <input
+    type="text"
+    inputMode="numeric"
+    pattern="[0-9]*"
+    className={inputBase}
+    placeholder="Enter Numeric Value"
+    value={data.targetAudience || ""}
+    onChange={(e) =>
+      update({
+        targetAudience: e.target.value.replace(/[^0-9]/g, ""),
+      })
+    }
+  />
+</Field>
 
           {/* ✅ OPTIONAL — no asterisk, no validation */}
           <Field label="Existing Website" optional>
