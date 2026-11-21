@@ -1426,20 +1426,26 @@ export default function AdminClient() {
                           <td className="px-3 py-2 text-right">
                             <button
                               onClick={async () => {
-                                const newPass = prompt(`Enter new temporary password for ${u.name}:`);
-                                if (!newPass) return;
-                                const res = await fetch(`/api/admin/users/${u._id}/reset-password`, {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ password: newPass }),
-                                });
-                                const json = await res.json();
-                                if (json.success) {
-                                  alert("Password reset successfully and emailed to user.");
-                                  await loadUsers();
-                                } else {
-                                  alert("Failed: " + json.error);
-                                }
+                         // in AdminClient, both places (mobile + desktop table)
+const newPass = prompt(`Enter new temporary password for ${u.name}:`);
+if (!newPass) return;
+
+const res = await fetch("/api/admin/users", {
+  method: "PATCH",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    userId: u._id,
+    newPassword: newPass,
+    clearRequest: true,   // clears the passwordRequest flag
+  }),
+});
+const json = await res.json();
+if (json.success) {
+  alert("Password reset successfully and emailed to user.");
+  await loadUsers();
+} else {
+  alert("Failed: " + json.error);
+}
                               }}
                               className="px-2 py-1 bg-indigo-600 text-white font-semibold text-[10px] rounded-md hover:bg-indigo-700 whitespace-nowrap"
                             >
