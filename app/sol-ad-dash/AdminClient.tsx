@@ -1439,7 +1439,7 @@ const res = await fetch("/api/admin/users", {
     clearRequest: true,   // clears the passwordRequest flag
   }),
 });
-const json = await res.json();
+const json = await res.json(); 
 if (json.success) {
   alert("Password reset successfully and emailed to user.");
   await loadUsers();
