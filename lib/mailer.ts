@@ -150,7 +150,7 @@ export function welcomeEmail(name: string, email: string, password: string) {
       </tr>
       <tr>
         <td style="padding: 16px;">
-          <span style="display: block; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Temporary Password</span>
+          <span style="display: block; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;"> Password</span>
           <code style="display: inline-block; background-color: #e2e8f0; color: #0f172a; padding: 6px 10px; border-radius: 4px; font-family: monospace; font-size: 16px; font-weight: 600;">${password}</code>
         </td>
       </tr>
@@ -170,7 +170,7 @@ export function passwordChangedEmail(name: string, newPassword: string) {
   const content = `
     <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 22px; font-weight: 600;">Password Updated</h2>
     <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
-      Hi ${name}, an administrator has reset your CRM password. Your new temporary password is below.
+      Hi ${name}, an administrator has reset your CRM password. Your new  password is below.
     </p>
     
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
