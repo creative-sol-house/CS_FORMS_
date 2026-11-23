@@ -78,7 +78,7 @@ export async function POST(req: Request) {
 
     // Fire welcome email (non-blocking failure)
     try {
-      const tpl = welcomeEmail(user.name, password, user.email);
+const tpl = welcomeEmail(user.name, user.email, password);
       await sendMail({ to: user.email, subject: tpl.subject, html: tpl.html });
     } catch (mailErr) {
       console.error("Welcome email failed:", mailErr);
