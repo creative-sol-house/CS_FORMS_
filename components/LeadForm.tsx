@@ -52,7 +52,7 @@ export default function LeadForm({
   const [err, setErr] = useState("");
 
 const [data, setData] = useState<Partial<InquiryData>>(() => ({
-  clientType: "Individual",
+  clientType: "Business",
   consultantName,
   agreeToTerms: true,
   subscribeUpdates: false,
