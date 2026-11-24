@@ -744,8 +744,14 @@ function Field({ label, required, error, children }: { label: string; required?:
 
 const inputBase = "w-full px-3.5 py-2.5 text-sm text-stone-900 bg-white rounded-lg border transition-colors placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500";
 
-function TextInput({ value, onChange, onBlur, placeholder, type = "text", autoFocus }: {
-  value: string; onChange: (v: string) => void; onBlur?: () => void; placeholder?: string; type?: string; autoFocus?: boolean;
+function TextInput({ value, onChange, onBlur, onFocus, placeholder, type = "text", autoFocus }: {
+  value: string; 
+  onChange: (v: string) => void; 
+  onBlur?: () => void; 
+  onFocus?: () => void; // ← Add this
+  placeholder?: string; 
+  type?: string; 
+  autoFocus?: boolean;
 }) {
   return (
     <input
@@ -753,6 +759,7 @@ function TextInput({ value, onChange, onBlur, placeholder, type = "text", autoFo
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
+      onFocus={onFocus} // ← Add this
       placeholder={placeholder}
       autoFocus={autoFocus}
       className={`${inputBase} border-stone-300 hover:border-stone-400`}
