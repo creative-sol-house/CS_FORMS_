@@ -101,7 +101,11 @@ createdById?: string;
       agreeToTerms: boolean;
   subscribeUpdates?: boolean;
   attachments?: LeadAttachment[];
+      leadCreatedAt?: string; // ISO string
+  source?: "form" | "manual" | "import";  // ✅ NEW
+
   followUps?: FollowUp[]; // <--- Add this here
+
 
 }
 

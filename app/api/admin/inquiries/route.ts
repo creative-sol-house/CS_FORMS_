@@ -97,6 +97,21 @@ export async function POST(req: Request) {
     await connectDB();
     const body = await req.json();
 
+    // ── Normalize the user-supplied "Lead Created" timestamp ────────────────
+    // If the client sent a value, parse it. If parsing fails, fall back to now.
+    // If nothing was sent at all, default to now.
+    let leadCreatedAt: Date;
+    if (body.leadCreatedAt) {
+      const parsed = new Date(body.leadCreatedAt);
+      leadCreatedAt = isNaN(parsed.getTime()) ? new Date() : parsed;
+    } else {
+      leadCreatedAt = new Date();
+    }
+
+    // Flag a meaningful backdate (>1 min off from "now") for the audit trail
+    const isBackdated =
+      Math.abs(leadCreatedAt.getTime() - Date.now()) > 60_000;
+
     // Server-enforced creator identity — never trust client
     const payload = {
       ...body,
@@ -108,10 +123,18 @@ export async function POST(req: Request) {
       notes: "",
       messages: [],
       attachments: Array.isArray(body.attachments) ? body.attachments : [],
+
+      // ✅ NEW — server-authoritative Lead Created timestamp
+      leadCreatedAt,
+
       auditLogs: [
         {
           action: "Created",
-          details: `Lead created by ${session.name} (${session.role})`,
+          details:
+            `Lead created by ${session.name} (${session.role})` +
+            (isBackdated
+              ? ` · backdated to ${leadCreatedAt.toLocaleString()}`
+              : ""),
           performedBy: session.name,
           timestamp: new Date(),
         },
@@ -242,6 +265,15 @@ export async function PATCH(req: Request) {
     delete updates.updatedAt;
     delete updates.__v;
 
+    // ✅ NEW — normalize leadCreatedAt so Mongo stores a real Date
+    if (updates.leadCreatedAt !== undefined) {
+      const parsed = updates.leadCreatedAt
+        ? new Date(updates.leadCreatedAt)
+        : null;
+      updates.leadCreatedAt =
+        parsed && !isNaN(parsed.getTime()) ? parsed : new Date();
+    }
+
     if (updates.status && updates.status !== inquiry.status)
       logDetails.push(`Status: ${inquiry.status} → ${updates.status}`);
     if (
@@ -249,6 +281,22 @@ export async function PATCH(req: Request) {
       updates.assignedTo !== inquiry.assignedTo
     )
       logDetails.push(`Assigned to: ${updates.assignedTo || "Unassigned"}`);
+
+    // ✅ NEW — log Lead Created date change
+    if (updates.leadCreatedAt !== undefined) {
+      const prev = (inquiry as any).leadCreatedAt
+        ? new Date((inquiry as any).leadCreatedAt)
+        : null;
+      const next = updates.leadCreatedAt as Date;
+      const prevTime = prev ? prev.getTime() : 0;
+      if (prevTime !== next.getTime()) {
+        logDetails.push(
+          `Lead created date: ${
+            prev ? prev.toLocaleString() : "—"
+          } → ${next.toLocaleString()}`
+        );
+      }
+    }
 
     const updateQuery: any = { $set: { ...updates } };
 

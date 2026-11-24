@@ -181,67 +181,32 @@ export default function ManageLeadModal({
                     <Cell label="Service" value={lead.serviceCategory} bold />
                     <Cell label="Contact Via" value={lead.preferredContactMethod} />
                     <Cell label="Best Time" value={lead.preferredContactTime} />
+                    <Cell
+  label="Lead Created"
+  value={lead.leadCreatedAt ? new Date(lead.leadCreatedAt).toLocaleString() : undefined}
+/>
                   </div>
                 </div>
 
-                {/* Service details */}
+                {/* ALL USER-SUBMITTED INFORMATION */}
                 <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
                   <h3 className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                    {lead.serviceCategory} Details
+                    <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a2 2 0 01.707.293l5.414 5.414a2 2 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    All Submitted Information
                   </h3>
-
-                  {lead.serviceCategory === "Automation Software" && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                      <Cell label="Commodity" value={lead.commodityName} />
-                      <Cell label="Service Type" value={lead.serviceType} />
-                      <Cell label="Timeline" value={lead.timeline} />
-                      {lead.commodityFeatures?.length ? (
-                        <Cell label="Features" value={lead.commodityFeatures.join(", ")} block />
-                      ) : null}
-                    </div>
-                  )}
-                  {lead.serviceCategory === "Web Development" && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                      <Cell label="Goal" value={lead.websiteGoal} />
-                      <Cell label="Pages" value={lead.pagesNeeded} />
-                      <Cell label="Launch Date" value={lead.launchDate} />
-                      <Cell label="Existing Site" value={lead.existingWebsite} />
-                      {lead.featuresNeeded && <Cell label="Features" value={lead.featuresNeeded} block />}
-                    </div>
-                  )}
-                  {lead.serviceCategory === "Logo Design" && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                      <Cell label="Logo Type" value={lead.logoType} />
-                      <Cell label="Colors" value={lead.colorPreferences} />
-                      <Cell label="Tagline" value={lead.tagline} />
-                      <Cell label="Message" value={lead.logoMessage} block />
-                    </div>
-                  )}
-                  {lead.serviceCategory === "Digital Marketing" && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                      <Cell label="Brand Name" value={lead.brandName} />
-                      <Cell label="Nature" value={lead.natureOfBusiness} />
-                      <Cell label="Target Audience" value={lead.targetAudienceFull} block />
-                    </div>
-                  )}
-                </div>
-
-                {/* Brief */}
-                <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
-                  <h3 className="text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <svg className="w-4 h-4 text-stone-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    Project Brief
-                  </h3>
-                  <div className="space-y-4">
-                    {lead.projectTitle && <Cell label="Title" value={lead.projectTitle} bold />}
-                    {lead.projectGoals && <Cell label="Goals" value={lead.projectGoals} block />}
-                    {lead.targetAudience && <Cell label="Target Audience" value={lead.targetAudience} block />}
-                    {lead.additionalNotes && (
-                      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                        <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">Additional Notes</p>
-                        <p className="text-[13px] text-amber-900 leading-relaxed whitespace-pre-wrap">{lead.additionalNotes}</p>
-                      </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                    {getVisibleLeadFields(lead).map(([key, value]) => (
+                      <Cell
+                        key={key}
+                        label={formatFieldLabel(key)}
+                        value={formatFieldValue(value)}
+                        block={isLongField(key, value)}
+                      />
+                    ))}
+                    {getVisibleLeadFields(lead).length === 0 && (
+                      <p className="text-sm text-stone-400 col-span-full">No additional information was submitted.</p>
                     )}
                   </div>
                 </div>
@@ -703,9 +668,17 @@ function PrintSheet({
                 <span className="pf-meta-val">{lead.assignedTo || "Unassigned"}</span>
               </div>
               <div className="pf-meta-row">
+  <span className="pf-meta-key">Lead Created:</span>
+  <span className="pf-meta-val">
+    {lead.leadCreatedAt ? new Date(lead.leadCreatedAt).toLocaleString() : new Date(lead.createdAt).toLocaleString()}
+  </span>
+</div>
+              <div className="pf-meta-row">
                 <span className="pf-meta-key">Created Date:</span>
                 <span className="pf-meta-val">{new Date(lead.createdAt).toLocaleDateString()}</span>
               </div>
+
+              
             </div>
           </div>
 
@@ -806,107 +779,110 @@ function buildPrintSections(lead: InquiryDoc): {
   title: string;
   rows: { label: string; value: string }[];
 }[] {
-  const makeSection = (title: string) => {
-    const rows: { label: string; value: string }[] = [];
-    const add = (label: string, v?: string | string[] | null) => {
-      if (Array.isArray(v)) {
-        if (v.length > 0) rows.push({ label, value: v.join(", ") });
-      } else if (v !== undefined && v !== null && String(v).trim() !== "") {
-        rows.push({ label, value: String(v).trim() });
-      }
-    };
-    return { title, rows, add };
+  const sections: { title: string; rows: { label: string; value: string }[] }[] = [];
+
+  const clientRows: { label: string; value: string }[] = [];
+  const addClient = (label: string, value: unknown) => {
+    const formatted = formatFieldValue(value);
+    if (formatted !== "") clientRows.push({ label, value: formatted });
   };
 
-  const clientSec = makeSection("1. Client & Contact Information");
-  clientSec.add("Full Name", lead.fullName);
-  clientSec.add("Client Type", lead.clientType);
-  clientSec.add("Email Address", lead.email);
-  clientSec.add("Phone Number", lead.phone);
-  clientSec.add("Company / Organization", lead.companyName);
-  clientSec.add("Designation / Role", lead.designation);
-  clientSec.add("Preferred Contact Method", lead.preferredContactMethod);
-  clientSec.add("Preferred Contact Time", lead.preferredContactTime);
-  clientSec.add("Consultant Name", lead.consultantName);
+  addClient("Full Name", lead.fullName);
+  addClient("Client Type", lead.clientType);
+  addClient("Email Address", lead.email);
+  addClient("Phone Number", lead.phone);
+  addClient("Company / Organization", lead.companyName);
+  addClient("Designation / Role", lead.designation);
+  addClient("Consultant Name", lead.consultantName);
+  addClient("Preferred Contact Method", lead.preferredContactMethod);
+  addClient("Preferred Contact Time", lead.preferredContactTime);
+  if (clientRows.length) sections.push({ title: "1. Client & Contact Information", rows: clientRows });
 
-  const projectSec = makeSection("2. Project Overview");
-  projectSec.add("Requirement Type", lead.requirementType);
-  projectSec.add("Service Category", lead.serviceCategory);
-  projectSec.add("Project Title", lead.projectTitle);
-  projectSec.add("Project Goals", lead.projectGoals);
-  projectSec.add("Target Audience", lead.targetAudience);
-  projectSec.add("Existing Website", lead.existingWebsite);
-  projectSec.add("Additional Client Notes", lead.additionalNotes);
+  const submittedRows = getVisibleLeadFields(lead)
+    .map(([key, value]) => ({ label: formatFieldLabel(key), value: formatFieldValue(value) }))
+    .filter((row) => row.value !== "");
 
-  const serviceSec = makeSection(`3. ${lead.serviceCategory || "Service"} Specifications`);
-
-  if (lead.serviceCategory === "Automation Software") {
-    serviceSec.add("Commodity Type", lead.commodityType);
-    serviceSec.add("Commodity Name", lead.commodityName);
-    serviceSec.add("Commodity Features", lead.commodityFeatures);
-    serviceSec.add("Commodity Delivery", lead.commodityDelivery);
-    serviceSec.add("Commodity References", lead.commodityRefs);
-    serviceSec.add("Service Type", lead.serviceType);
-    serviceSec.add("Project Description", lead.projectDescription);
-    serviceSec.add("Service Features", lead.serviceFeatures);
-    serviceSec.add("Estimated Timeline", lead.timeline);
-    serviceSec.add("Service References", lead.serviceRefs);
+  if (submittedRows.length) {
+    sections.push({ title: "2. All Submitted Information", rows: submittedRows });
   }
 
-  if (lead.serviceCategory === "Web Development") {
-    serviceSec.add("Pages Needed", lead.pagesNeeded);
-    serviceSec.add("Features Needed", lead.featuresNeeded);
-    serviceSec.add("Website Goal", lead.websiteGoal);
-    serviceSec.add("Target Launch Date", lead.launchDate);
-    serviceSec.add("Reference Websites", lead.referenceWebsites);
-    serviceSec.add("Additional Suggestions", lead.additionalSuggestions);
-  }
+  const operationalRows: { label: string; value: string }[] = [];
+  const addOperational = (label: string, value: unknown) => {
+    const formatted = formatFieldValue(value);
+    if (formatted !== "") operationalRows.push({ label, value: formatted });
+  };
+  addOperational("Lead Status", lead.status);
+  addOperational("Assigned To", lead.assignedTo);
+  addOperational("Lead Source", (lead as any).source);
+  addOperational("Created By", (lead as any).createdBy);
+  addOperational("Lead Created", lead.leadCreatedAt || lead.createdAt);
+  if (operationalRows.length) sections.push({ title: "3. Lead Management Information", rows: operationalRows });
 
-  if (lead.serviceCategory === "Logo Design") {
-    serviceSec.add("Brand Name", lead.brandName);
-    serviceSec.add("Tagline", lead.tagline);
-    serviceSec.add("Nature of Business", lead.natureOfBusiness);
-    serviceSec.add("Logo Type", lead.logoType);
-    serviceSec.add("Business Description", lead.businessDescription);
-    serviceSec.add("Unique Selling Proposition (USP)", lead.usp);
-    serviceSec.add("Color Preferences", lead.colorPreferences);
-    serviceSec.add("Liked Logos", lead.likedLogos);
-    serviceSec.add("Competitor Branding", lead.competitorBranding);
-    serviceSec.add("Audience Detail", lead.audienceDetail);
-    serviceSec.add("Logo Message", lead.logoMessage);
-  }
+  return sections;
+}
 
-  if (lead.serviceCategory === "Digital Marketing") {
-    serviceSec.add("Brand Name", lead.brandName);
-    serviceSec.add("Nature of Business", lead.natureOfBusiness);
-    serviceSec.add("Business Activities", lead.businessActivities);
-    serviceSec.add("Major Clients", lead.majorClients);
-    serviceSec.add("Country-Wise Market", lead.countryWiseMarket);
-    serviceSec.add("Target Audience (Full)", lead.targetAudienceFull);
-    serviceSec.add("Business Keywords", lead.businessKeywords50);
-    serviceSec.add("Total Products", lead.totalProducts);
-    serviceSec.add("Top-Rated Products", lead.topRatedProducts);
-    serviceSec.add("Top Product Keywords", lead.topProductKeywords);
-    serviceSec.add("Important Page / Product", lead.importantPageOrProduct);
-    serviceSec.add("Social Media Credentials", lead.socialMediaCredentials);
-    serviceSec.add("Sample Banners", lead.sampleBanners);
-    serviceSec.add("Sample Blogs", lead.sampleBlogs);
-    serviceSec.add("Sample Copywriting", lead.sampleCopywriting);
-    serviceSec.add("GSC Details", lead.gscDetails);
-    serviceSec.add("Dynamic URL Recommendations", lead.dynamicUrlRecs);
-    serviceSec.add("Existing Search Submissions", lead.existingSearchSubmissions);
-    serviceSec.add("Relevant Links", lead.relevantLink);
-    serviceSec.add("Community Engagements", lead.communityEngagements);
-    serviceSec.add("SERP Positioning", lead.serpPositioning);
-    serviceSec.add("Competitor Names / URLs", lead.competitorNamesUrls);
-  }
+const HIDDEN_LEAD_FIELDS = new Set([
+  "_id", "__v", "createdAt", "updatedAt",
+  "fullName", "email", "phone", "clientType", "companyName", "designation",
+  "consultantName", "preferredContactMethod", "preferredContactTime",
+  "status", "assignedTo", "notes", "messages", "auditLogs", "attachments",
+  "submissionLocation", "createdBy", "createdById", "consultantId",
+  "leadCreatedAt", "source",
+]);
 
-  return [clientSec, projectSec, serviceSec].filter((s) => s.rows.length > 0);
+function getVisibleLeadFields(lead: InquiryDoc): [string, unknown][] {
+  return Object.entries(lead as any).filter(([key, value]) => {
+    if (HIDDEN_LEAD_FIELDS.has(key)) return false;
+    if (value === undefined || value === null) return false;
+    if (typeof value === "string" && value.trim() === "") return false;
+    if (Array.isArray(value) && value.length === 0) return false;
+    return true;
+  });
+}
+
+function formatFieldLabel(key: string): string {
+  const labels: Record<string, string> = {
+    targetAudience: "Target Audience",
+    targetAudienceFull: "Target Audience (Full)",
+    businessKeywords50: "Business Keywords",
+    gscDetails: "Google Search Console Details",
+    dynamicUrlRecs: "Dynamic URL Recommendations",
+    serpPositioning: "SERP Positioning",
+    usp: "Unique Selling Proposition (USP)",
+    relevantLink: "Relevant Links",
+  };
+  if (labels[key]) return labels[key];
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\\b\\w/g, (char) => char.toUpperCase());
+}
+
+function formatFieldValue(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (value instanceof Date) return value.toLocaleString();
+  if (typeof value === "number") return String(value);
+  if (Array.isArray(value)) {
+    return value.map((item) => formatFieldValue(item)).filter(Boolean).join(", ");
+  }
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined && item !== null && item !== "")
+      .map(([key, item]) => `${formatFieldLabel(key)}: ${formatFieldValue(item)}`)
+      .join("\\n");
+  }
+  return String(value).trim();
+}
+
+function isLongField(key: string, value: unknown): boolean {
+  const text = formatFieldValue(value);
+  return text.length > 90 || /description|notes|audience|goals|features|reference|credential|activities|keywords|suggestion|message|detail|timeline|follow.?up/i.test(key);
 }
 
 /* ── UI primitives ── */
 function Cell({ label, value, bold, block }: { label: string; value?: string; bold?: boolean; block?: boolean }) {
-  if (!value) return null;
+  if (value === undefined || value === null || value === "") return null;
   return (
     <div className={block ? "col-span-full" : ""}>
       <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">{label}</p>

@@ -51,13 +51,14 @@ export default function LeadForm({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
-  const [data, setData] = useState<Partial<InquiryData>>(() => ({
-    clientType: "Individual",
-    consultantName,
-    agreeToTerms: true,
-    subscribeUpdates: false,
-    ...initialData,
-  }));
+const [data, setData] = useState<Partial<InquiryData>>(() => ({
+  clientType: "Individual",
+  consultantName,
+  agreeToTerms: true,
+  subscribeUpdates: false,
+  leadCreatedAt: initialData?.leadCreatedAt || new Date().toISOString(),
+  ...initialData,
+}));
 
   const [attachments, setAttachments] = useState<LeadAttachment[]>(
     () => (initialData?.attachments as LeadAttachment[] | undefined) ?? []
@@ -333,6 +334,14 @@ function StepClient({
         <Field label="Designation">
           <TextInput value={data.designation || ""} onChange={(v) => set("designation", v)} placeholder="Marketing Head" />
         </Field>
+        <Field label="Lead Created" required>
+  <input
+    type="datetime-local"
+    value={toDatetimeLocal(data.leadCreatedAt)}
+    onChange={(e) => set("leadCreatedAt", new Date(e.target.value).toISOString())}
+    className={`${inputBase} border-stone-300 hover:border-stone-400`}
+  />
+</Field>
       </div>
     </div>
   );
@@ -352,6 +361,13 @@ function StepServiceDetails({
   if (service === "Logo Design")         return <LogoFields data={data} set={set} />;
   if (service === "Digital Marketing")   return <MarketingFields data={data} set={set} />;
   return null;
+}
+
+function toDatetimeLocal(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function AutomationFields({ data, set, setArray }: any) {
@@ -653,6 +669,10 @@ function StepReview({
           <Summary label="Company" value={data.companyName || "—"} />
           <Summary label="Designation" value={data.designation || "—"} />
           <Summary label="Attachments" value={`${attachments.length} file(s)`} />
+          <Summary
+  label="Lead Created"
+  value={data.leadCreatedAt ? new Date(data.leadCreatedAt).toLocaleString() : "—"}
+/>
         </dl>
       </div>
     </div>

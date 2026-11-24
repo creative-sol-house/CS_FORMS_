@@ -10,7 +10,7 @@ export interface IInquiry extends InquiryData, Document {
   onsiteAddress?: string;
   auditLogs: AuditLog[];
   submissionLocation?: SubmissionLocation;
-  followUps?: FollowUp[]; // Explicitly declare it here too for safety
+  followUps?: FollowUp[];
   attachments?: LeadAttachment[];
 }
 
@@ -41,6 +41,15 @@ const InquirySchema = new Schema<IInquiry>(
     consultantId: { type: String, trim: true },
     createdBy: { type: String, trim: true },
     createdById: { type: String, trim: true },
+
+    // ✅ NEW — how the lead entered the system
+    source: {
+      type: String,
+      enum: ["form", "manual", "import"],
+      default: "manual",
+      index: true,
+    },
+
     companyName: { type: String, trim: true },
     designation: { type: String, trim: true },
     requirementType: { type: String, enum: ["Commodity", "Service"] },
@@ -124,7 +133,7 @@ const InquirySchema = new Schema<IInquiry>(
         uploadedAt: Date,
       },
     ],
-    
+    leadCreatedAt: { type: Date, default: Date.now },
     followUps: [
       {
         date: Date,
