@@ -37,13 +37,11 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const focus = url.searchParams.get("focus");
 
-    // Single-lead fetch (used by fast chat polling)
     if (focus) {
       const one = await Inquiry.findById(focus).lean();
       if (!one)
         return NextResponse.json({ success: true, inquiries: [] });
 
-      // Permission check for non-admins: must own it OR be assigned to it
       if (session.role !== "admin") {
         const ownsIt = (one as any).createdById === session.userId;
         const assigned = one.assignedTo === session.name;
@@ -58,7 +56,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, inquiries: [one] });
     }
 
-    // Full list — non-admins see leads they created OR are assigned to
+    // ✅ already correct: created OR assigned
     const query =
       session.role === "admin"
         ? {}
@@ -98,8 +96,6 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     // ── Normalize the user-supplied "Lead Created" timestamp ────────────────
-    // If the client sent a value, parse it. If parsing fails, fall back to now.
-    // If nothing was sent at all, default to now.
     let leadCreatedAt: Date;
     if (body.leadCreatedAt) {
       const parsed = new Date(body.leadCreatedAt);
@@ -108,7 +104,6 @@ export async function POST(req: Request) {
       leadCreatedAt = new Date();
     }
 
-    // Flag a meaningful backdate (>1 min off from "now") for the audit trail
     const isBackdated =
       Math.abs(leadCreatedAt.getTime() - Date.now()) > 60_000;
 
@@ -123,8 +118,6 @@ export async function POST(req: Request) {
       notes: "",
       messages: [],
       attachments: Array.isArray(body.attachments) ? body.attachments : [],
-
-      // ✅ NEW — server-authoritative Lead Created timestamp
       leadCreatedAt,
 
       auditLogs: [
@@ -149,10 +142,10 @@ export async function POST(req: Request) {
             ]
           : []),
       ],
-      assignedTo:
-        session.role === "business_developer"
-          ? session.name
-          : body.assignedTo || "",
+
+      // ✅ FIX: do NOT force-assign to creator.
+      // Creator visibility is handled by createdById in GET/SSE.
+      assignedTo: body.assignedTo || "",
     };
     delete (payload as any).newMessage;
     delete (payload as any).markRead;
@@ -164,18 +157,13 @@ export async function POST(req: Request) {
       const admins = await User.find({ role: "admin" }).lean();
       for (const admin of admins) {
         if (!admin.email) continue;
-        const tpl = leadCreatedByDeveloperEmail(
-          admin.name,
-          session.name,
-          lead
-        );
+        const tpl = leadCreatedByDeveloperEmail(admin.name, session.name, lead);
         await sendMail({ to: admin.email, subject: tpl.subject, html: tpl.html });
       }
     } catch (mailErr) {
       console.error("Admin notify email failed:", mailErr);
     }
 
-    // ── Broadcast so other open dashboards update live
     try {
       broadcastLeadUpdate(lead.toObject ? lead.toObject() : lead);
     } catch {}

@@ -130,7 +130,9 @@ const [data, setData] = useState<Partial<InquiryData>>(() => ({
       role="dialog"
       aria-modal="true"
     >
-      <div className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm" onClick={onClose} />
+      {/* Backdrop — intentionally NOT clickable. The user must use the X, Cancel,
+    or Back button to close, so an accidental outside click never loses data. */}
+<div className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm" aria-hidden="true" />
 
       <div className="relative w-full sm:max-w-3xl bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[94vh] ring-1 ring-stone-900/5">
         {/* Header */}

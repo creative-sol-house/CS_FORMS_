@@ -12,6 +12,59 @@ const STATUS_COLORS: Record<string, string> = {
   "Call Back": "#8b5cf6", "Not Interested": "#ef4444",
 };
 
+const STATUSES = ["Pending", "Interested", "Call Back", "Approved", "Not Interested"] as const;
+const SERVICES = ["Automation Software", "Web Development", "Logo Design", "Digital Marketing"] as const;
+
+type SourceFilter = "All" | "Created" | "Assigned" | "Both";
+type PresetKey = "all" | "today" | "week" | "month" | "lastMonth" | "custom";
+
+// ── Date helpers ────────────────────────────────────────────
+function startOfDay(d: Date) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+function endOfDay(d: Date) {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+function getPresetRange(preset: PresetKey): { from: string; to: string } {
+  const now = new Date();
+  if (preset === "today") {
+    return {
+      from: startOfDay(now).toISOString().slice(0, 10),
+      to: endOfDay(now).toISOString().slice(0, 10),
+    };
+  }
+  if (preset === "week") {
+    const day = now.getDay(); // 0=Sun
+    const diff = day === 0 ? 6 : day - 1; // Monday start
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - diff);
+    return {
+      from: startOfDay(monday).toISOString().slice(0, 10),
+      to: endOfDay(now).toISOString().slice(0, 10),
+    };
+  }
+  if (preset === "month") {
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    return {
+      from: startOfDay(first).toISOString().slice(0, 10),
+      to: endOfDay(now).toISOString().slice(0, 10),
+    };
+  }
+  if (preset === "lastMonth") {
+    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const last = new Date(now.getFullYear(), now.getMonth(), 0);
+    return {
+      from: startOfDay(first).toISOString().slice(0, 10),
+      to: endOfDay(last).toISOString().slice(0, 10),
+    };
+  }
+  return { from: "", to: "" };
+}
+
 export default function UserAnalysisPanel({
   analysis, reload, onSelectLead,
 }: {
@@ -20,8 +73,16 @@ export default function UserAnalysisPanel({
   onSelectLead: (lead: InquiryDoc) => void;
 }) {
   const [userId, setUserId] = useState("");
+
+  // ── Filters
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("All");
+  const [serviceFilter, setServiceFilter] = useState<string>("All");
+  const [preset, setPreset] = useState<PresetKey>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [month, setMonth] = useState(""); // "2025-11" style
 
   const selected = useMemo(
     () => analysis.find((u) => u._id === userId) || null,
@@ -32,9 +93,109 @@ export default function UserAnalysisPanel({
     if (!userId && analysis.length) setUserId(analysis[0]._id);
   }, [analysis, userId]);
 
+  // When preset changes, sync dateFrom/dateTo
+  useEffect(() => {
+    if (preset === "custom" || preset === "all") return;
+    const { from, to } = getPresetRange(preset);
+    setDateFrom(from);
+    setDateTo(to);
+    setMonth("");
+  }, [preset]);
+
+  // Classify each lead relative to this user
+  const classifyLead = (l: any): "Created" | "Assigned" | "Both" => {
+    const uid = selected?._id;
+    const uname = selected?.name;
+    const createdByMe =
+      (l.createdById && l.createdById === uid) ||
+      (l.createdBy && l.createdBy === uname);
+    const assignedToMe = l.assignedTo && l.assignedTo === uname;
+    if (createdByMe && assignedToMe) return "Both";
+    if (createdByMe) return "Created";
+    return "Assigned";
+  };
+
+  // ── Filter pipeline used by BOTH chart + table ─────────────
+  const filteredLeads = useMemo(() => {
+    if (!selected?.leads) return [];
+    let rows = [...selected.leads];
+
+    // Source
+    if (sourceFilter !== "All") {
+      rows = rows.filter((l: any) => classifyLead(l) === sourceFilter);
+    }
+    // Status
+    if (statusFilter !== "All") {
+      rows = rows.filter((l: any) => l.status === statusFilter);
+    }
+    // Service
+    if (serviceFilter !== "All") {
+      rows = rows.filter((l: any) => l.serviceCategory === serviceFilter);
+    }
+    // Month (overrides manual date range)
+    if (month) {
+      const [y, m] = month.split("-").map(Number);
+      rows = rows.filter((l: any) => {
+        const d = new Date(l.createdAt);
+        return d.getFullYear() === y && d.getMonth() + 1 === m;
+      });
+    } else {
+      // Date range
+      if (dateFrom) {
+        const f = new Date(dateFrom).setHours(0, 0, 0, 0);
+        rows = rows.filter((l: any) => new Date(l.createdAt).getTime() >= f);
+      }
+      if (dateTo) {
+        const t = new Date(dateTo).setHours(23, 59, 59, 999);
+        rows = rows.filter((l: any) => new Date(l.createdAt).getTime() <= t);
+      }
+    }
+    // Search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      rows = rows.filter(
+        (l: any) =>
+          l.fullName?.toLowerCase().includes(q) ||
+          l.email?.toLowerCase().includes(q) ||
+          l.phone?.toLowerCase().includes(q)
+      );
+    }
+    return rows;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, search, statusFilter, sourceFilter, serviceFilter, month, dateFrom, dateTo]);
+
+  // ── Aggregated summary computed over FILTERED leads ────────
+  const summary = useMemo(() => {
+    const created = filteredLeads.filter(
+      (l: any) =>
+        (l.createdById && l.createdById === selected?._id) ||
+        (l.createdBy && l.createdBy === selected?.name)
+    ).length;
+    const assigned = filteredLeads.filter(
+      (l: any) => l.assignedTo && l.assignedTo === selected?.name
+    ).length;
+    const both = filteredLeads.filter((l: any) => {
+      const byMe =
+        (l.createdById && l.createdById === selected?._id) ||
+        (l.createdBy && l.createdBy === selected?.name);
+      const toMe = l.assignedTo && l.assignedTo === selected?.name;
+      return byMe && toMe;
+    }).length;
+    const statusCounts: Record<string, number> = {};
+    STATUSES.forEach((s) => (statusCounts[s] = 0));
+    filteredLeads.forEach((l: any) => {
+      if (statusCounts[l.status] !== undefined) statusCounts[l.status]++;
+    });
+    const approved = statusCounts["Approved"] || 0;
+    const total = filteredLeads.length;
+    const conversionRate = total > 0 ? Math.round((approved / total) * 100) : 0;
+    return { created, assigned, both, total, statusCounts, conversionRate };
+  }, [filteredLeads, selected]);
+
+  // ── Charts computed over FILTERED leads ────────────────────
   const chart = useMemo(() => {
-    if (!selected?.leads?.length) return { timeline: [], status: [], services: [] };
-    const leads = selected.leads as any[];
+    if (!filteredLeads.length) return { timeline: [], status: [], services: [] };
+    const leads = filteredLeads as any[];
 
     const dayMap: Record<string, number> = {};
     leads.forEach((l) => {
@@ -60,23 +221,27 @@ export default function UserAnalysisPanel({
     const services = Object.keys(svcMap).map((name) => ({ name, value: svcMap[name] }));
 
     return { timeline, status, services };
-  }, [selected]);
+  }, [filteredLeads]);
 
-  const visibleLeads = useMemo(() => {
-    if (!selected?.leads) return [];
-    let rows = [...selected.leads];
-    if (statusFilter !== "All") rows = rows.filter((l: any) => l.status === statusFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      rows = rows.filter(
-        (l: any) =>
-          l.fullName?.toLowerCase().includes(q) ||
-          l.email?.toLowerCase().includes(q) ||
-          l.phone?.toLowerCase().includes(q)
-      );
-    }
-    return rows;
-  }, [selected, search, statusFilter]);
+  const clearFilters = () => {
+    setSearch("");
+    setStatusFilter("All");
+    setSourceFilter("All");
+    setServiceFilter("All");
+    setPreset("all");
+    setDateFrom("");
+    setDateTo("");
+    setMonth("");
+  };
+
+  const activeFilterCount =
+    (search ? 1 : 0) +
+    (statusFilter !== "All" ? 1 : 0) +
+    (sourceFilter !== "All" ? 1 : 0) +
+    (serviceFilter !== "All" ? 1 : 0) +
+    (preset !== "all" ? 1 : 0) +
+    (dateFrom || dateTo ? 1 : 0) +
+    (month ? 1 : 0);
 
   return (
     <div className="bg-white border border-stone-200 shadow-sm">
@@ -86,14 +251,14 @@ export default function UserAnalysisPanel({
         <div className="flex items-center gap-3">
           <h2 className="text-xs font-bold text-black uppercase tracking-wider">User Analytics</h2>
           <select
-            className="px-2.5 py-1.5 border border-stone-300 text-xs font-medium outline-none focus:border-indigo-500 bg-white min-w-48"
+            className="px-2.5 py-1.5 border border-stone-300 text-xs font-medium outline-none focus:border-indigo-500 bg-white min-w-52"
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
           >
             <option value="" disabled>Select team member…</option>
             {analysis.map((u) => (
               <option key={u._id} value={u._id}>
-                {u.name} ({u.leads.length} leads)
+                {u.name} ({u.createdCount ?? u.leads.length} created · {u.assignedCount ?? u.leads.length} assigned)
               </option>
             ))}
           </select>
@@ -113,15 +278,163 @@ export default function UserAnalysisPanel({
         </div>
       ) : (
         <>
-          {/* ── KPI STRIP ──────────────────────────────────── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 border-b border-stone-200 divide-x divide-stone-200">
-            <KPI label="Total Leads" value={selected.leads.length} color="text-black" />
-            <KPI label="Approved" value={selected.statusCounts.Approved} color="text-emerald-600" />
-            <KPI label="Interested" value={selected.statusCounts.Interested} color="text-indigo-600" />
-            <KPI label="Conversion" value={`${selected.conversionRate}%`} color="text-black" />
+          {/* ── FILTER BAR ─────────────────────────────────── */}
+          <div className="px-4 py-3 border-b border-stone-200 bg-stone-50/40 space-y-2">
+            {/* Row 1: quick presets + clear */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-bold text-black/50 uppercase tracking-wider mr-1">Range</span>
+              {([
+                ["all", "All time"],
+                ["today", "Today"],
+                ["week", "This week"],
+                ["month", "This month"],
+                ["lastMonth", "Last month"],
+                ["custom", "Custom"],
+              ] as [PresetKey, string][]).map(([k, label]) => (
+                <button
+                  key={k}
+                  onClick={() => setPreset(k)}
+                  className={`px-2 py-1 text-[10.5px] font-semibold border transition-colors ${
+                    preset === k
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-white text-stone-700 border-stone-300 hover:bg-stone-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={clearFilters}
+                  className="ml-2 px-2 py-1 text-[10.5px] font-semibold text-rose-600 border border-rose-200 bg-rose-50 hover:bg-rose-100"
+                >
+                  Clear ({activeFilterCount})
+                </button>
+              )}
+            </div>
+
+            {/* Row 2: source + status + service + dates */}
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
+                className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
+              >
+                <option value="All">All sources</option>
+                <option value="Created">Created by user only</option>
+                <option value="Assigned">Assigned to user only</option>
+                <option value="Both">Created & assigned (Both)</option>
+              </select>
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
+              >
+                <option value="All">All statuses</option>
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <select
+                value={serviceFilter}
+                onChange={(e) => setServiceFilter(e.target.value)}
+                className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
+              >
+                <option value="All">All services</option>
+                {SERVICES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <span className="text-[10px] text-black/30 mx-1">|</span>
+
+              {/* Month picker */}
+              <input
+                type="month"
+                value={month}
+                onChange={(e) => {
+                  setMonth(e.target.value);
+                  if (e.target.value) {
+                    setDateFrom("");
+                    setDateTo("");
+                    setPreset("custom");
+                  }
+                }}
+                className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
+                title="Filter by month"
+              />
+
+              {/* Custom range */}
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  setMonth("");
+                  setPreset("custom");
+                }}
+                className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
+                title="From date"
+              />
+              <span className="text-[10px] text-black/40">→</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setMonth("");
+                  setPreset("custom");
+                }}
+                className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
+                title="To date"
+              />
+
+              <input
+                className="px-2.5 py-1 border border-stone-300 text-[11px] text-black outline-none focus:border-indigo-500 w-40 ml-auto"
+                placeholder="Search name / email…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
           </div>
 
-          {/* ── CHARTS ROW (3 panels in one frame) ─────────── */}
+          {/* ── SUMMARY (over filtered leads) ─────────────── */}
+          <div className="grid grid-cols-2 md:grid-cols-5 border-b border-stone-200 divide-x divide-stone-200 bg-stone-50/50">
+            <SplitCard
+              label="Created by user"
+              value={summary.created}
+              hint="In current filter"
+              color="text-indigo-700"
+            />
+            <SplitCard
+              label="Assigned to user"
+              value={summary.assigned}
+              hint="In current filter"
+              color="text-emerald-700"
+            />
+            <SplitCard
+              label="Created & assigned"
+              value={summary.both}
+              hint="Overlap"
+              color="text-amber-700"
+            />
+            <SplitCard
+              label="Total shown"
+              value={summary.total}
+              hint="Union (deduped)"
+              color="text-black"
+            />
+            <SplitCard
+              label="Conversion"
+              value={`${summary.conversionRate}%`}
+              hint="Approved ÷ shown"
+              color="text-black"
+            />
+          </div>
+
+          {/* ── CHARTS ─────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 border-b border-stone-200 divide-y lg:divide-y-0 lg:divide-x divide-stone-200">
             <div className="lg:col-span-1 p-4">
               <ChartTitle>Lead Activity</ChartTitle>
@@ -180,39 +493,20 @@ export default function UserAnalysisPanel({
             </div>
           </div>
 
-          {/* ── TABLE TOOLBAR ──────────────────────────────── */}
+          {/* ── TABLE ──────────────────────────────────────── */}
           <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-2.5 border-b border-stone-200 bg-stone-50">
             <h3 className="text-[11px] font-bold text-black uppercase tracking-wider">
-              Leads <span className="text-black/50 font-normal normal-case">({visibleLeads.length})</span>
+              Leads <span className="text-black/50 font-normal normal-case">({filteredLeads.length})</span>
             </h3>
-            <div className="flex gap-2">
-              <input
-                className="px-2.5 py-1 border border-stone-300 text-xs text-black outline-none focus:border-indigo-500 w-44"
-                placeholder="Search…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <select
-                className="px-2.5 py-1 border border-stone-300 text-xs text-black outline-none focus:border-indigo-500 bg-white"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="All">All</option>
-                <option>Pending</option>
-                <option>Interested</option>
-                <option>Call Back</option>
-                <option>Approved</option>
-                <option>Not Interested</option>
-              </select>
-            </div>
           </div>
 
-          {/* ── TABLE ──────────────────────────────────────── */}
           <div className="overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-stone-50 z-10">
                 <tr className="border-b border-stone-200 text-left">
                   <Th>Client</Th>
+                  <Th>Source</Th>
+                  <Th>Assigned To</Th>
                   <Th>Status</Th>
                   <Th>Service</Th>
                   <Th>Date</Th>
@@ -220,27 +514,58 @@ export default function UserAnalysisPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
-                {visibleLeads.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-black/50">No leads found</td></tr>
-                ) : visibleLeads.map((l: any) => (
-                  <tr key={l._id} className="hover:bg-stone-50/50">
-                    <td className="px-4 py-2.5">
-                      <div className="font-medium text-black text-[13px] leading-tight">{l.fullName}</div>
-                      <div className="text-[10.5px] text-black/60">{l.email}</div>
-                    </td>
-                    <td className="px-4 py-2.5"><Pill status={l.status} /></td>
-                    <td className="px-4 py-2.5 text-[11px] text-black">{l.serviceCategory}</td>
-                    <td className="px-4 py-2.5 text-[11px] text-black/60">
-                      {new Date(l.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button onClick={() => onSelectLead(l)}
-                        className="text-indigo-600 font-semibold hover:underline text-[11px]">
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredLeads.length === 0 ? (
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-black/50">No leads match these filters</td></tr>
+                ) : filteredLeads.map((l: any) => {
+                  const source = classifyLead(l);
+                  const sourceBadge =
+                    source === "Both"
+                      ? { label: "Both", cls: "bg-amber-50 text-amber-700 border-amber-200" }
+                      : source === "Created"
+                      ? { label: "Created", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" }
+                      : { label: "Assigned", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+                  const assignedElsewhere =
+                    source === "Created" && l.assignedTo && l.assignedTo !== selected.name;
+
+                  return (
+                    <tr key={l._id} className="hover:bg-stone-50/50">
+                      <td className="px-4 py-2.5">
+                        <div className="font-medium text-black text-[13px] leading-tight">{l.fullName}</div>
+                        <div className="text-[10.5px] text-black/60">{l.email}</div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className={`px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider border ${sourceBadge.cls}`}>
+                          {sourceBadge.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {l.assignedTo ? (
+                          <div className="flex flex-col">
+                            <span className={`text-[11px] ${l.assignedTo === selected.name ? "text-emerald-700 font-semibold" : "text-black/80"}`}>
+                              {l.assignedTo}
+                            </span>
+                            {assignedElsewhere && (
+                              <span className="text-[9px] text-amber-700">(handed off)</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-stone-400 italic">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5"><Pill status={l.status} /></td>
+                      <td className="px-4 py-2.5 text-[11px] text-black">{l.serviceCategory}</td>
+                      <td className="px-4 py-2.5 text-[11px] text-black/60">
+                        {new Date(l.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <button onClick={() => onSelectLead(l)}
+                          className="text-indigo-600 font-semibold hover:underline text-[11px]">
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -252,11 +577,12 @@ export default function UserAnalysisPanel({
 
 // ── Helpers ────────────────────────────────────────────────
 
-function KPI({ label, value, color }: { label: string; value: number | string; color: string }) {
+function SplitCard({ label, value, hint, color }: { label: string; value: number | string; hint: string; color: string }) {
   return (
     <div className="px-4 py-3">
       <p className="text-[10px] font-bold text-black/50 uppercase tracking-wider">{label}</p>
       <p className={`text-xl font-bold mt-0.5 ${color}`}>{value}</p>
+      <p className="text-[9.5px] text-black/50 mt-0.5">{hint}</p>
     </div>
   );
 }

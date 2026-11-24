@@ -78,6 +78,7 @@ export default function ManageLeadModal({
   return (
     <>
       {/* ─────────── SCREEN-ONLY MODAL ─────────── */}
+      
       <div
         className="screen-only fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6 z-50 transition-opacity"
         onClick={onClose}

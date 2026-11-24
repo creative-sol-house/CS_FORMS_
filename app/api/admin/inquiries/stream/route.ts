@@ -29,49 +29,53 @@ export async function GET() {
   await connectDB();
 
   const stream = new ReadableStream({
-    async start(controller) {
-      const enc = new TextEncoder();
+   async start(controller) {
+  const enc = new TextEncoder();
 
-      // Send a keep-alive comment every 25s (Vercel closes idle streams ~30s)
-      const heartbeat = setInterval(() => {
-        try {
-          controller.enqueue(enc.encode(": ping\n\n"));
-        } catch {}
-      }, 25000);
+  const heartbeat = setInterval(() => {
+    try {
+      controller.enqueue(enc.encode(": ping\n\n"));
+    } catch {}
+  }, 25000);
 
-      const listener: Listener = (payload) => {
-        try {
-          controller.enqueue(enc.encode(`data: ${payload}\n\n`));
-        } catch {}
-      };
+  const listener: Listener = (payload) => {
+    try {
+      controller.enqueue(enc.encode(`data: ${payload}\n\n`));
+    } catch {}
+  };
 
-      listeners.add(listener);
+  listeners.add(listener);
 
-      // Send an initial snapshot so client is in sync
-      try {
-        const query =
-          session.role === "admin" ? {} : { assignedTo: session.name };
-        const inquiries = await Inquiry.find(query).sort({ createdAt: -1 }).lean();
-        controller.enqueue(
-          enc.encode(
-            `data: ${JSON.stringify({ type: "snapshot", inquiries })}\n\n`
-          )
-        );
-      } catch {}
+// Send an initial snapshot so client is in sync
+try {
+  const query =
+    session.role === "admin"
+      ? {}
+      : {
+          $or: [
+            { assignedTo: session.name },
+            { createdById: session.userId },
+          ],
+        };
+  const inquiries = await Inquiry.find(query).sort({ createdAt: -1 }).lean();
+  controller.enqueue(
+    enc.encode(
+      `data: ${JSON.stringify({ type: "snapshot", inquiries })}\n\n`
+    )
+  );
+} catch {}
 
-      // Cleanup on disconnect
-      const cleanup = () => {
-        clearInterval(heartbeat);
-        listeners.delete(listener);
-        try {
-          controller.close();
-        } catch {}
-      };
+  const cleanup = () => {
+    clearInterval(heartbeat);
+    listeners.delete(listener);
+    try {
+      controller.close();
+    } catch {}
+  };
 
-      // If the client disconnects, the stream throws — we catch via abort
-      // (Next.js handles this by cancelling the stream)
-      (controller as any)._cleanup = cleanup;
-    },
+  (controller as any)._cleanup = cleanup;
+},
+
     cancel() {
       // Called when client disconnects
       // Remove all listeners that were added in this stream

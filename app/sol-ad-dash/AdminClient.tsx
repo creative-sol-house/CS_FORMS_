@@ -1016,12 +1016,20 @@ export default function AdminClient() {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-stone-500 flex-wrap">
-                        <span className="truncate">{creator}</span>
-                        <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${badge.cls}`}>{badge.label}</span>
-                        <span>·</span>
-                        <span className="truncate">{i.serviceCategory || "General"}</span>
-                      </div>
+                 {i.assignedTo && (
+  <div className="mt-1 text-[10px] font-medium flex items-center gap-1 flex-wrap">
+    <span className="text-stone-500">Assigned to:</span>
+    <span className={i.assignedTo === user.name ? "text-indigo-700 font-semibold" : "text-stone-800"}>
+      {i.assignedTo}
+      {i.assignedTo === user.name ? " (you)" : ""}
+    </span>
+  </div>
+)}
+{i.assignedTo && i.assignedTo !== user.name && (
+  <div className="mt-1 text-[9px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 inline-block">
+    ⓘ You created this — now handled by {i.assignedTo}
+  </div>
+)}
                       <div className="flex items-center gap-1.5 mt-2">
                         <select
                           value={i.status}
@@ -1047,68 +1055,97 @@ export default function AdminClient() {
                 })}
               </ul>
 
-              <div className="hidden lg:block">
-                <table className="w-full text-sm table-fixed">
-                  <thead>
-                    <tr className="bg-stone-50 border-b border-stone-200 text-left">
-                      <th className="w-[32%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
-                      <th className="w-[22%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Created By</th>
-                      <th className="w-[20%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Status</th>
-                      <th className="w-[16%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Service</th>
-                      <th className="w-[10%] px-3 py-2"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {bdFiltered.length === 0 ? (
-                      <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-black/50">No leads match these filters.</td></tr>
-                    ) : bdFiltered.map((i) => {
-                      const creator = getCreatorName(i);
-                      const role = getCreatorRole(i);
-                      const badge = formatCreatorBadge(role);
-                      const unread = user ? unreadCountFor(i, user.name) : 0;
-                      return (
-                        <tr key={i._id} className="hover:bg-stone-50/50">
-                          <td className="px-3 py-2">
-                            <div className="font-medium text-black text-[12px] truncate">{i.fullName}</div>
-                            <div className="text-[10px] text-black/50 truncate">{i.email}</div>
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-1 min-w-0">
-                              <span className="text-[11px] text-stone-700 truncate">{creator}</span>
-                              <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border shrink-0 ${badge.cls}`}>{badge.label}</span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2">
-                            <select
-                              value={i.status}
-                              onChange={(e) => updateLead(i._id, { status: e.target.value })}
-                              className="w-full text-[10px] border border-stone-200 rounded-md p-1 bg-white"
-                            >
-                              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                          </td>
-                          <td className="px-3 py-2 text-[11px] text-black/70 truncate">{i.serviceCategory || "General"}</td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center justify-end gap-1">
-                              <IconButton label="Chat" onClick={() => openChat(i)} badge={unread > 0}>
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                </svg>
-                              </IconButton>
-                              <IconButton label="View" onClick={() => setSelected(i)}>
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                              </IconButton>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+         <div className="hidden lg:block">
+  <table className="w-full text-sm table-fixed">
+    <thead>
+      <tr className="bg-stone-50 border-b border-stone-200 text-left">
+        <th className="w-[26%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
+        <th className="w-[18%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Created By</th>
+        <th className="w-[18%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Assigned To</th>
+        <th className="w-[16%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Status</th>
+        <th className="w-[14%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Service</th>
+        <th className="w-[8%] px-3 py-2"></th>
+      </tr>
+    </thead>
+    <tbody className="divide-y divide-stone-100">
+      {bdFiltered.length === 0 ? (
+        <tr>
+          <td colSpan={6} className="px-3 py-6 text-center text-xs text-black/50">
+            No leads match these filters.
+          </td>
+        </tr>
+      ) : bdFiltered.map((i) => {
+        const creator = getCreatorName(i);
+        const role = getCreatorRole(i);
+        const badge = formatCreatorBadge(role);
+        const unread = user ? unreadCountFor(i, user.name) : 0;
+        const createdByMe = i.createdById === user?.userId || i.createdBy === user?.name;
+        const assignedToOther = !!i.assignedTo && i.assignedTo !== user?.name;
+
+        return (
+          <tr key={i._id} className="hover:bg-stone-50/50">
+            <td className="px-3 py-2">
+              <div className="font-medium text-black text-[12px] truncate">{i.fullName}</div>
+              <div className="text-[10px] text-black/50 truncate">{i.email}</div>
+            </td>
+            <td className="px-3 py-2">
+              <div className="flex items-center gap-1 min-w-0">
+                <span className="text-[11px] text-stone-700 truncate">{creator}</span>
+                <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border shrink-0 ${badge.cls}`}>
+                  {badge.label}
+                </span>
               </div>
+            </td>
+            <td className="px-3 py-2">
+              {i.assignedTo ? (
+                <div className="flex flex-col gap-0.5">
+                  <span className={`text-[11px] truncate ${i.assignedTo === user?.name ? "text-indigo-700 font-semibold" : "text-stone-800"}`}>
+                    {i.assignedTo}
+                    {i.assignedTo === user?.name ? " (you)" : ""}
+                  </span>
+                  {createdByMe && assignedToOther && (
+                    <span className="text-[8px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 inline-block w-fit">
+                      You created · now with {i.assignedTo}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-[10px] text-stone-400 italic">Unassigned</span>
+              )}
+            </td>
+            <td className="px-3 py-2">
+              <select
+                value={i.status}
+                onChange={(e) => updateLead(i._id, { status: e.target.value })}
+                className="w-full text-[10px] border border-stone-200 rounded-md p-1 bg-white"
+              >
+                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </td>
+            <td className="px-3 py-2 text-[11px] text-black/70 truncate">
+              {i.serviceCategory || "General"}
+            </td>
+            <td className="px-3 py-2">
+              <div className="flex items-center justify-end gap-1">
+                <IconButton label="Chat" onClick={() => openChat(i)} badge={unread > 0}>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </IconButton>
+                <IconButton label="View" onClick={() => setSelected(i)}>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </IconButton>
+              </div>
+            </td>
+          </tr>
+        );
+      })}
+    </tbody>
+  </table>
+</div>
             </div>
           </div>
         )}
