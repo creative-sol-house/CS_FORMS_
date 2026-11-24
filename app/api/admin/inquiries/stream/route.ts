@@ -3,17 +3,48 @@ import { verifySession } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import Inquiry from "@/lib/Inquiry";
 
-// ── In-memory subscriber registry (per serverless instance)
-// Works fine on Vercel for a small admin team. For multi-instance scale,
-// swap for Redis pub/sub or Pusher.
-type Listener = (data: any) => void;
-const listeners = new Set<Listener>();
+// ── Subscriber registry ─────────────────────────────────────
+// Each listener now remembers WHO is subscribed, so we can filter
+// broadcasts per-recipient. Without this, any lead:update leaks to
+// every connected tab.
+type Subscriber = {
+  listener: (data: string) => void;
+  userId: string;
+  name: string;
+  role: string;
+};
+
+const subscribers = new Set<Subscriber>();
+
+// ── Visibility rule (mirror of GET + snapshot query) ────────
+function canSee(
+  sub: Subscriber,
+  lead: any
+): boolean {
+  if (sub.role === "admin") return true;
+  if (!lead) return false;
+  // Creator?
+  if (lead.createdById && lead.createdById === sub.userId) return true;
+  if (lead.createdBy && lead.createdBy === sub.name) return true;
+  // Assignee?
+  if (lead.assignedTo && lead.assignedTo === sub.name) return true;
+  return false;
+}
 
 export function broadcastLeadUpdate(lead: any) {
   const payload = JSON.stringify({ type: "lead:update", lead });
-  for (const l of listeners) {
+  for (const sub of subscribers) {
     try {
-      l(payload);
+      if (canSee(sub, lead)) {
+        sub.listener(payload);
+      } else {
+        // If the recipient was previously allowed to see this lead but
+        // now isn't (reassigned, unassigned, deleted), tell them to drop it.
+        // The client treats "__drop" as "remove this row".
+        sub.listener(
+          JSON.stringify({ type: "lead:update", lead: { _id: lead._id, __drop: true } })
+        );
+      }
     } catch {}
   }
 }
@@ -29,57 +60,61 @@ export async function GET() {
   await connectDB();
 
   const stream = new ReadableStream({
-   async start(controller) {
-  const enc = new TextEncoder();
+    async start(controller) {
+      const enc = new TextEncoder();
 
-  const heartbeat = setInterval(() => {
-    try {
-      controller.enqueue(enc.encode(": ping\n\n"));
-    } catch {}
-  }, 25000);
+      const heartbeat = setInterval(() => {
+        try {
+          controller.enqueue(enc.encode(": ping\n\n"));
+        } catch {}
+      }, 25000);
 
-  const listener: Listener = (payload) => {
-    try {
-      controller.enqueue(enc.encode(`data: ${payload}\n\n`));
-    } catch {}
-  };
+      const subscriber: Subscriber = {
+        userId: session.userId,
+        name: session.name,
+        role: session.role,
+        listener: (payload) => {
+          try {
+            controller.enqueue(enc.encode(`data: ${payload}\n\n`));
+          } catch {}
+        },
+      };
 
-  listeners.add(listener);
+      subscribers.add(subscriber);
 
-// Send an initial snapshot so client is in sync
-try {
-  const query =
-    session.role === "admin"
-      ? {}
-      : {
-          $or: [
-            { assignedTo: session.name },
-            { createdById: session.userId },
-          ],
-        };
-  const inquiries = await Inquiry.find(query).sort({ createdAt: -1 }).lean();
-  controller.enqueue(
-    enc.encode(
-      `data: ${JSON.stringify({ type: "snapshot", inquiries })}\n\n`
-    )
-  );
-} catch {}
+      // ✅ Initial snapshot: created-by-me OR assigned-to-me (non-admin)
+      try {
+        const query =
+          session.role === "admin"
+            ? {}
+            : {
+                $or: [
+                  { assignedTo: session.name },
+                  { createdById: session.userId },
+                  { createdBy: session.name },
+                ],
+              };
+        const inquiries = await Inquiry.find(query).sort({ createdAt: -1 }).lean();
+        controller.enqueue(
+          enc.encode(
+            `data: ${JSON.stringify({ type: "snapshot", inquiries })}\n\n`
+          )
+        );
+      } catch {}
 
-  const cleanup = () => {
-    clearInterval(heartbeat);
-    listeners.delete(listener);
-    try {
-      controller.close();
-    } catch {}
-  };
+      const cleanup = () => {
+        clearInterval(heartbeat);
+        subscribers.delete(subscriber);
+        try {
+          controller.close();
+        } catch {}
+      };
 
-  (controller as any)._cleanup = cleanup;
-},
-
+      (controller as any)._cleanup = cleanup;
+    },
     cancel() {
-      // Called when client disconnects
-      // Remove all listeners that were added in this stream
-      // (Simplified — we rely on the try/catch in broadcast to drop dead ones)
+      // Next.js calls this on client disconnect; the listener is
+      // removed via the subscriber set on the next broadcast attempt.
     },
   });
 

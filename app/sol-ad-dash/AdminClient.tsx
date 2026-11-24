@@ -146,38 +146,67 @@ export default function AdminClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!user) return;
-    const es = new EventSource("/api/admin/inquiries/stream");
-    es.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === "snapshot") {
-          setInquiries(data.inquiries);
+useEffect(() => {
+  if (!user) return;
+  const es = new EventSource("/api/admin/inquiries/stream");
+  es.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type === "snapshot") {
+        setInquiries(data.inquiries);
+        return;
+      }
+      if (data.type === "lead:update") {
+        const lead = data.lead;
+
+        // ── 1. Explicit drop signal (server says: you can no longer see this)
+        if (lead.__drop) {
+          setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
+          if (chatLead?._id === lead._id) setChatLead(null);
+          if (selected?._id === lead._id) setSelected(null);
           return;
         }
-        if (data.type === "lead:update") {
-          const lead = data.lead;
-          if (lead.__deleted) {
-            setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
-            if (chatLead?._id === lead._id) setChatLead(null);
-            if (selected?._id === lead._id) setSelected(null);
-            return;
-          }
-          setInquiries((prev) => {
-            const exists = prev.some((i) => i._id === lead._id);
-            return exists
-              ? prev.map((i) => (i._id === lead._id ? lead : i))
-              : [lead, ...prev];
-          });
-          setChatLead((prev) => (prev?._id === lead._id ? lead : prev));
-          setSelected((prev) => (prev?._id === lead._id ? lead : prev));
+
+        // ── 2. Deletion signal (existing behaviour)
+        if (lead.__deleted) {
+          setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
+          if (chatLead?._id === lead._id) setChatLead(null);
+          if (selected?._id === lead._id) setSelected(null);
+          return;
         }
-      } catch {}
-    };
-    return () => es.close();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+
+        // ── 3. Defensive client-side visibility check.
+        //     Even if the server were to mis-broadcast, don't show
+        //     a lead the current user has no claim to.
+        const mine = user.role === "admin"
+          ? true
+          : (lead.createdById && lead.createdById === user.userId) ||
+            (lead.createdBy && lead.createdBy === user.name) ||
+            (lead.assignedTo && lead.assignedTo === user.name);
+
+        if (!mine) {
+          // Not visible to me — remove if it was previously shown
+          setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
+          if (chatLead?._id === lead._id) setChatLead(null);
+          if (selected?._id === lead._id) setSelected(null);
+          return;
+        }
+
+        // ── 4. Normal upsert
+        setInquiries((prev) => {
+          const exists = prev.some((i) => i._id === lead._id);
+          return exists
+            ? prev.map((i) => (i._id === lead._id ? lead : i))
+            : [lead, ...prev];
+        });
+        setChatLead((prev) => (prev?._id === lead._id ? lead : prev));
+        setSelected((prev) => (prev?._id === lead._id ? lead : prev));
+      }
+    } catch {}
+  };
+  return () => es.close();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [user]);
 
   const login = async () => {
     setLoading(true);
