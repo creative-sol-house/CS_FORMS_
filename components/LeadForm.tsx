@@ -373,30 +373,36 @@ function FeaturesInput({
   placeholder?: string;
 }) {
   const [text, setText] = useState(() => (value || []).join(", "));
+  const isFocused = useRef(false); // Prevent parent from overwriting while typing
 
+  // Only sync from parent if we are NOT currently typing in the box
   useEffect(() => {
-    setText((value || []).join(", "));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value?.length]);
-
-  const commit = (raw: string) => {
-    onChange(
-      raw
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-    );
-  };
+    if (!isFocused.current) {
+      setText((value || []).join(", "));
+    }
+  }, [value]);
 
   return (
     <TextInput
       value={text}
-      onChange={(v) => setText(v)}
-      onBlur={() => commit(text)}
+      onFocus={() => { isFocused.current = true; }}
+      onChange={(v) => {
+        setText(v); // Always update local text immediately
+        // Send the array to the parent in the background
+        onChange(v.split(",").map((s) => s.trim()).filter(Boolean));
+      }}
+      onBlur={() => {
+        isFocused.current = false;
+        // Clean up the text format when they click away (e.g. "a, b, c")
+        const cleaned = text.split(",").map((s) => s.trim()).filter(Boolean).join(", ");
+        setText(cleaned);
+        onChange(text.split(",").map((s) => s.trim()).filter(Boolean));
+      }}
       placeholder={placeholder}
     />
   );
 }
+
 function AutomationFields({ data, set }: any) {
     return (
     <div className="space-y-6">
