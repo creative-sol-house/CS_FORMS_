@@ -67,11 +67,6 @@ const [data, setData] = useState<Partial<InquiryData>>(() => ({
   const set = <K extends keyof InquiryData>(k: K, v: InquiryData[K]) =>
     setData((d) => ({ ...d, [k]: v }));
 
-  const setArray = (k: "commodityFeatures" | "serviceFeatures", raw: string) =>
-    setData((d) => ({
-      ...d,
-      [k]: raw.split(",").map((s) => s.trim()).filter(Boolean),
-    }));
 
   const stepErrors = useMemo(() => {
     const e: Record<string, string> = {};
@@ -193,12 +188,11 @@ const [data, setData] = useState<Partial<InquiryData>>(() => ({
           )}
           {step === 1 && <StepClient data={data} set={set} errors={stepErrors} />}
           {step === 2 && serviceCategory && (
-            <StepServiceDetails
-              service={serviceCategory}
-              data={data}
-              set={set}
-              setArray={setArray}
-            />
+     <StepServiceDetails
+  service={serviceCategory}
+  data={data}
+  set={set}
+/>
           )}
           {step === 3 && <StepAttachments value={attachments} onChange={setAttachments} />}
           {step === 4 && (
@@ -349,14 +343,13 @@ function StepClient({
 
 /* ─────────────── Step 2 ─────────────── */
 function StepServiceDetails({
-  service, data, set, setArray,
+  service, data, set,
 }: {
   service: ServiceCategory;
   data: Partial<InquiryData>;
   set: <K extends keyof InquiryData>(k: K, v: InquiryData[K]) => void;
-  setArray: (k: "commodityFeatures" | "serviceFeatures", raw: string) => void;
 }) {
-  if (service === "Automation Software") return <AutomationFields data={data} set={set} setArray={setArray} />;
+  if (service === "Automation Software") return <AutomationFields data={data} set={set} />;
   if (service === "Web Development")     return <WebDevFields data={data} set={set} />;
   if (service === "Logo Design")         return <LogoFields data={data} set={set} />;
   if (service === "Digital Marketing")   return <MarketingFields data={data} set={set} />;
@@ -370,8 +363,42 @@ function toDatetimeLocal(iso?: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function AutomationFields({ data, set, setArray }: any) {
+function FeaturesInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string[] | undefined;
+  onChange: (v: string[]) => void;
+  placeholder?: string;
+}) {
+  const [text, setText] = useState(() => (value || []).join(", "));
+
+  useEffect(() => {
+    setText((value || []).join(", "));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value?.length]);
+
+  const commit = (raw: string) => {
+    onChange(
+      raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    );
+  };
+
   return (
+    <TextInput
+      value={text}
+      onChange={(v) => setText(v)}
+      onBlur={() => commit(text)}
+      placeholder={placeholder}
+    />
+  );
+}
+function AutomationFields({ data, set }: any) {
+    return (
     <div className="space-y-6">
       <div>
         <SectionHeader title="Project overview" subtitle="What's the requirement?" />
@@ -422,9 +449,13 @@ function AutomationFields({ data, set, setArray }: any) {
             </Field>
           </div>
           <div className="mt-4 space-y-4">
-            <Field label="Features (comma separated)">
-              <TextInput value={(data.commodityFeatures || []).join(", ")} onChange={(v) => setArray("commodityFeatures", v)} placeholder="Feature A, Feature B, Feature C" />
-            </Field>
+         <Field label="Features (comma separated)">
+  <FeaturesInput
+    value={data.commodityFeatures}
+    onChange={(v) => set("commodityFeatures", v)}
+    placeholder="Feature A, Feature B, Feature C"
+  />
+</Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Delivery terms">
                 <TextInput value={data.commodityDelivery || ""} onChange={(v) => set("commodityDelivery", v)} />
@@ -452,9 +483,12 @@ function AutomationFields({ data, set, setArray }: any) {
             <Field label="Project description">
               <TextArea value={data.projectDescription || ""} onChange={(v) => set("projectDescription", v)} />
             </Field>
-            <Field label="Service features (comma separated)">
-              <TextInput value={(data.serviceFeatures || []).join(", ")} onChange={(v) => setArray("serviceFeatures", v)} />
-            </Field>
+        <Field label="Service features (comma separated)">
+  <FeaturesInput
+    value={data.serviceFeatures}
+    onChange={(v) => set("serviceFeatures", v)}
+  />
+</Field>
             <Field label="References">
               <TextInput value={data.serviceRefs || ""} onChange={(v) => set("serviceRefs", v)} />
             </Field>
@@ -704,14 +738,15 @@ function Field({ label, required, error, children }: { label: string; required?:
 
 const inputBase = "w-full px-3.5 py-2.5 text-sm text-stone-900 bg-white rounded-lg border transition-colors placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500";
 
-function TextInput({ value, onChange, placeholder, type = "text", autoFocus }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; type?: string; autoFocus?: boolean;
+function TextInput({ value, onChange, onBlur, placeholder, type = "text", autoFocus }: {
+  value: string; onChange: (v: string) => void; onBlur?: () => void; placeholder?: string; type?: string; autoFocus?: boolean;
 }) {
   return (
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
       placeholder={placeholder}
       autoFocus={autoFocus}
       className={`${inputBase} border-stone-300 hover:border-stone-400`}
