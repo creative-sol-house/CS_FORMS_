@@ -310,11 +310,11 @@ function StepClient({
           <TextInput value={data.fullName || ""} onChange={(v) => set("fullName", v)} placeholder="Jane Doe" autoFocus />
         </Field>
         <Field label="Client type" required>
-          <Select
-            value={data.clientType || "Individual"}
-            onChange={(v) => set("clientType", v as ClientType)}
-            options={[{ value: "Individual", label: "Individual" }, { value: "Business", label: "Business" }]}
-          />
+       <Select
+  value={data.clientType || "Business"}
+  onChange={(v) => set("clientType", v as ClientType)}
+  options={[{ value: "Individual", label: "Individual" }, { value: "Business", label: "Business" }]}
+/>
         </Field>
         <Field label="Email" required error={errors.email}>
           <TextInput type="email" value={data.email || ""} onChange={(v) => set("email", v)} placeholder="jane@company.com" />
