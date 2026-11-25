@@ -2,20 +2,19 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { InquiryDoc } from "@/lib/types";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
-// ── Constants (unchanged from your admin panel) ─────────────
-const COLORS = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
+// ── Constants ───────────────────────────────────────────────
+const COLORS = ["#4f46e5", "#0d9488", "#d97706", "#64748b", "#7c3aed", "#be185d"];
 const STATUS_COLORS: Record<string, string> = {
-  Approved: "#10b981",
+  Approved: "#059669",
   Interested: "#4f46e5",
-  Pending: "#f59e0b",
-  "Call Back": "#8b5cf6",
-  "Not Interested": "#ef4444",
+  Pending: "#d97706",
+  "Call Back": "#7c3aed",
+  "Not Interested": "#dc2626",
 };
 
 const STATUSES = ["Pending", "Interested", "Call Back", "Approved", "Not Interested"] as const;
@@ -23,6 +22,14 @@ const SERVICES = ["Automation Software", "Web Development", "Logo Design", "Digi
 
 type SourceFilter = "All" | "Created" | "Assigned" | "Both";
 type PresetKey = "all" | "today" | "week" | "month" | "lastMonth" | "custom";
+
+const TOOLTIP_STYLE = {
+  borderRadius: 8,
+  border: "1px solid #e7e5e4",
+  fontSize: 12,
+  boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+};
+const AXIS_TICK = { fill: "#78716c", fontSize: 11 };
 
 // ── Date helpers ────────────────────────────────────────────
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
@@ -91,6 +98,13 @@ type ApiResponse = {
   assignedLeads: any[];
   error?: string;
 };
+
+// ── Shared class strings ────────────────────────────────────
+const PANEL = "bg-white border border-stone-200 rounded-xl shadow-sm";
+const FIELD =
+  "w-full h-9 px-3 border border-stone-300 hover:border-stone-400 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/15 rounded-lg text-[13px] bg-white text-stone-900 outline-none transition-colors";
+const BTN_SECONDARY =
+  "inline-flex items-center gap-2 h-9 px-3.5 bg-white border border-stone-300 hover:bg-stone-50 hover:border-stone-400 text-stone-800 text-[13px] font-medium rounded-lg shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600/30 disabled:opacity-60 disabled:cursor-wait";
 
 export default function MyAnalyticsPage() {
   const router = useRouter();
@@ -204,7 +218,7 @@ export default function MyAnalyticsPage() {
   // ── Summary over filtered leads ───────────────────────
   const summary = useMemo(() => {
     if (!me) {
-      return { created: 0, assigned: 0, both: 0, total: 0, conversionRate: 0 };
+      return { created: 0, assigned: 0, both: 0, total: 0, approved: 0, conversionRate: 0 };
     }
     const created = filteredLeads.filter(
       (l) =>
@@ -224,7 +238,7 @@ export default function MyAnalyticsPage() {
     const approved = filteredLeads.filter((l) => l.status === "Approved").length;
     const total = filteredLeads.length;
     const conversionRate = total > 0 ? Math.round((approved / total) * 100) : 0;
-    return { created, assigned, both, total, conversionRate };
+    return { created, assigned, both, total, approved, conversionRate };
   }, [filteredLeads, me]);
 
   // ── Charts ────────────────────────────────────────────
@@ -281,26 +295,25 @@ export default function MyAnalyticsPage() {
     (month ? 1 : 0);
 
   // ── Loading / Error states ────────────────────────────
-  if (loading) {
+  if (loading && !me) {
     return (
-      <div className="min-h-screen bg-[#fafaf9] p-4 sm:p-6 lg:p-8 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-sm font-medium text-black">Loading your analytics…</p>
+      <div className="min-h-screen bg-[#f7f7f5] flex items-center justify-center p-6">
+        <div className="flex items-center gap-3 text-sm text-stone-600">
+          <span className="w-4 h-4 rounded-full border-2 border-stone-300 border-t-indigo-600 animate-spin" />
+          Loading your analytics…
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error && !me) {
     return (
-      <div className="min-h-screen bg-[#fafaf9] p-4 sm:p-6 lg:p-8 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-sm font-bold text-rose-700">{error}</p>
-          <button
-            onClick={load}
-            className="mt-4 px-3 py-1.5 bg-stone-100 text-black text-[11px] font-bold uppercase tracking-wider hover:bg-stone-200"
-          >
-            Retry
+      <div className="min-h-screen bg-[#f7f7f5] flex items-center justify-center p-6">
+        <div className={`${PANEL} p-6 max-w-sm w-full`}>
+          <p className="text-sm font-semibold text-stone-900">Couldn’t load your analytics</p>
+          <p className="text-[13px] text-stone-500 mt-1">{error}</p>
+          <button onClick={load} className={`${BTN_SECONDARY} mt-4`}>
+            Try again
           </button>
         </div>
       </div>
@@ -309,202 +322,235 @@ export default function MyAnalyticsPage() {
 
   if (!me) return null;
 
+  const serviceTotal = chart.services.reduce((a, s) => a + s.value, 0);
+
   // ── Render ────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#fafaf9] p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-[#f7f7f5] p-4 sm:p-6 lg:p-8 text-stone-900">
       <div className="max-w-7xl mx-auto">
-        
-        {/* TOP TOOLBAR */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-          <div className="flex items-center gap-3">
-            <button 
+
+        {/* HEADER */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+          <div className="min-w-0">
+            <button
               onClick={() => router.push("/sol-ad-dash")}
-              className="text-stone-400 hover:text-stone-700 transition-colors"
-              title="Back to Dashboard"
+              className="inline-flex items-center gap-1.5 text-[13px] text-stone-500 hover:text-stone-900 transition-colors mb-2 focus-visible:outline-none focus-visible:underline"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
+              Dashboard
             </button>
-            <h2 className="text-sm sm:text-base font-bold text-black uppercase tracking-wider">
-              My Analytics
-            </h2>
-            <span className="px-2.5 py-1.5 border border-stone-200 bg-white text-xs font-semibold text-black shadow-sm">
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">My analytics</h1>
+            <p className="text-[13px] text-stone-500 mt-0.5">
               {me.name}
-              <span className="text-black/40 font-normal hidden sm:inline"> · {me.role.replace("_", " ")}</span>
-            </span>
+              <span className="text-stone-400"> · {me.role.replace("_", " ")}</span>
+            </p>
           </div>
-          <button
-            onClick={load}
-            className="self-start sm:self-auto px-3 py-1.5 bg-white border border-stone-200 text-black text-[11px] font-bold uppercase tracking-wider hover:bg-stone-50 transition-colors shadow-sm"
-          >
-            Refresh
+
+          <button onClick={load} disabled={loading} className={`${BTN_SECONDARY} self-start sm:self-auto`}>
+            <svg
+              className={`w-3.5 h-3.5 text-stone-500 ${loading ? "animate-spin" : ""}`}
+              fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {loading ? "Refreshing…" : "Refresh"}
           </button>
         </div>
 
-        {/* FILTER BAR */}
-        <div className="bg-white border border-stone-200 shadow-sm p-3 sm:p-4 mb-6 space-y-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-bold text-black/50 uppercase tracking-wider mr-1 w-full sm:w-auto mb-1 sm:mb-0">
-              Range
-            </span>
-            {([
-              ["all", "All time"],
-              ["today", "Today"],
-              ["week", "This week"],
-              ["month", "This month"],
-              ["lastMonth", "Last month"],
-              ["custom", "Custom"],
-            ] as [PresetKey, string][]).map(([k, label]) => (
-              <button
-                key={k}
-                onClick={() => setPreset(k)}
-                className={`px-2 py-1 text-[10.5px] font-semibold border transition-colors ${
-                  preset === k
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-white text-stone-700 border-stone-300 hover:bg-stone-100"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-            {activeFilterCount > 0 && (
-              <button
-                onClick={clearFilters}
-                className="ml-0 sm:ml-2 px-2 py-1 text-[10.5px] font-semibold text-rose-600 border border-rose-200 bg-rose-50 hover:bg-rose-100"
-              >
-                Clear ({activeFilterCount})
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full sm:w-auto sm:flex-1">
-              <select
-                value={sourceFilter}
-                onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
-                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
-              >
-                <option value="All">All sources</option>
-                <option value="Created">Created by me</option>
-                <option value="Assigned">Assigned to me</option>
-                <option value="Both">Created & assigned to me</option>
-              </select>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
-              >
-                <option value="All">All statuses</option>
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-
-              <select
-                value={serviceFilter}
-                onChange={(e) => setServiceFilter(e.target.value)}
-                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
-              >
-                <option value="All">All services</option>
-                {SERVICES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-
-            <span className="hidden sm:block text-[10px] text-black/30 mx-1">|</span>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full sm:w-auto">
-              <input
-                type="month"
-                value={month}
-                onChange={(e) => {
-                  setMonth(e.target.value);
-                  if (e.target.value) {
-                    setDateFrom("");
-                    setDateTo("");
-                    setPreset("custom");
-                  }
-                }}
-                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
-                title="Filter by month"
-              />
-
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => {
-                  setDateFrom(e.target.value);
-                  setMonth("");
-                  setPreset("custom");
-                }}
-                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
-                title="From date"
-              />
-              
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => {
-                  setDateTo(e.target.value);
-                  setMonth("");
-                  setPreset("custom");
-                }}
-                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
-                title="To date"
+        {/* SUMMARY */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-px bg-stone-200 border border-stone-200 rounded-xl overflow-hidden shadow-sm mb-6">
+          <Stat label="Created by me" value={summary.created} hint="Leads you added" />
+          <Stat label="Assigned to me" value={summary.assigned} hint="Leads on your plate" />
+          <Stat label="Created & assigned" value={summary.both} hint="Added and kept by you" />
+          <Stat label="Total shown" value={summary.total} hint="Matching current filters" />
+          <div className="col-span-2 lg:col-span-1 bg-white p-4 sm:p-5">
+            <p className="text-xs text-stone-500">Conversion</p>
+            <p className="text-2xl sm:text-[28px] font-semibold tracking-tight tabular-nums mt-1.5 text-indigo-700">
+              {summary.conversionRate}%
+            </p>
+            <div className="h-1 bg-stone-100 rounded-full mt-2.5 overflow-hidden">
+              <div
+                className="h-full bg-indigo-600 rounded-full transition-[width] duration-700 ease-out"
+                style={{ width: `${summary.conversionRate}%` }}
               />
             </div>
-
-            <input
-              className="px-2.5 py-1.5 border border-stone-300 text-[11px] text-black outline-none focus:border-indigo-500 w-full sm:w-48 sm:ml-auto"
-              placeholder="Search name / email…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <p className="text-[11px] text-stone-400 mt-2 tabular-nums">
+              {summary.approved} approved of {summary.total}
+            </p>
           </div>
         </div>
 
-        {/* SUMMARY */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
-          <SplitCard label="Created by me" value={summary.created} hint="In current filter" color="text-indigo-700" />
-          <SplitCard label="Assigned to me" value={summary.assigned} hint="In current filter" color="text-emerald-700" />
-          <SplitCard label="Created & assigned" value={summary.both} hint="Overlap" color="text-amber-700" />
-          <SplitCard label="Total shown" value={summary.total} hint="Union (deduped)" color="text-black" />
-          <SplitCard label="Conversion" value={`${summary.conversionRate}%`} hint="Approved ÷ shown" color="text-black" />
+        {/* FILTERS */}
+        <div className={`${PANEL} p-4 mb-6 space-y-3`}>
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+            <div className="relative flex-1 min-w-0">
+              <svg className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                className={`${FIELD} pl-9`}
+                placeholder="Search by name, email or phone"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search leads"
+              />
+            </div>
+
+            {/* Segmented date range */}
+            <div className="overflow-x-auto -mx-1 px-1 lg:mx-0 lg:px-0">
+              <div className="inline-flex bg-stone-100 p-0.5 rounded-lg whitespace-nowrap" role="group" aria-label="Date range">
+                {([
+                  ["all", "All time"],
+                  ["today", "Today"],
+                  ["week", "This week"],
+                  ["month", "This month"],
+                  ["lastMonth", "Last month"],
+                  ["custom", "Custom"],
+                ] as [PresetKey, string][]).map(([k, label]) => (
+                  <button
+                    key={k}
+                    onClick={() => setPreset(k)}
+                    aria-pressed={preset === k}
+                    className={`h-8 px-3 text-[13px] font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600/30 ${
+                      preset === k
+                        ? "bg-white text-stone-900 shadow-sm"
+                        : "text-stone-500 hover:text-stone-800"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
+              className={FIELD}
+              aria-label="Lead source"
+            >
+              <option value="All">All sources</option>
+              <option value="Created">Created by me</option>
+              <option value="Assigned">Assigned to me</option>
+              <option value="Both">Created & assigned to me</option>
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className={FIELD}
+              aria-label="Status"
+            >
+              <option value="All">All statuses</option>
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+
+            <select
+              value={serviceFilter}
+              onChange={(e) => setServiceFilter(e.target.value)}
+              className={FIELD}
+              aria-label="Service"
+            >
+              <option value="All">All services</option>
+              {SERVICES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => {
+                setMonth(e.target.value);
+                if (e.target.value) {
+                  setDateFrom("");
+                  setDateTo("");
+                  setPreset("custom");
+                }
+              }}
+              className={FIELD}
+              title="Filter by month"
+              aria-label="Month"
+            />
+
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setMonth("");
+                setPreset("custom");
+              }}
+              className={FIELD}
+              title="From date"
+              aria-label="From date"
+            />
+
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setMonth("");
+                setPreset("custom");
+              }}
+              className={FIELD}
+              title="To date"
+              aria-label="To date"
+            />
+          </div>
+
+          {activeFilterCount > 0 && (
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-xs text-stone-500">
+                {activeFilterCount} {activeFilterCount === 1 ? "filter" : "filters"} applied
+              </p>
+              <button
+                onClick={clearFilters}
+                className="text-xs font-medium text-indigo-700 hover:text-indigo-900 hover:underline"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
         </div>
 
         {/* CHARTS */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white border border-stone-200 shadow-sm p-4">
-            <ChartTitle>Lead Activity</ChartTitle>
-            <div className="h-48">
+          <div className={`${PANEL} p-5`}>
+            <ChartTitle title="Lead activity" sub="New leads per day" />
+            <div className="h-52">
               {chart.timeline.length ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chart.timeline} margin={{ top: 5, right: 5, left: -28, bottom: 0 }}>
+                  <LineChart data={chart.timeline} margin={{ top: 5, right: 8, left: -24, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
-                    <XAxis dataKey="date" tick={{ fill: "#78716c", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                    <YAxis tick={{ fill: "#78716c", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip contentStyle={{ borderRadius: 4, border: "1px solid #e7e5e4", fontSize: 11 }} />
-                    <Line type="monotone" dataKey="leads" stroke="#4f46e5" strokeWidth={2} dot={{ r: 2.5, fill: "#4f46e5" }} activeDot={{ r: 4 }} />
+                    <XAxis dataKey="date" tick={AXIS_TICK} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} />
+                    <Line type="monotone" dataKey="leads" stroke="#4f46e5" strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : <Empty />}
             </div>
           </div>
 
-          <div className="bg-white border border-stone-200 shadow-sm p-4">
-            <ChartTitle>Status Breakdown</ChartTitle>
-            <div className="h-48">
+          <div className={`${PANEL} p-5`}>
+            <ChartTitle title="Status breakdown" sub="Where your leads stand" />
+            <div className="h-52">
               {chart.status.length ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chart.status} margin={{ top: 5, right: 5, left: -28, bottom: 0 }}>
+                  <BarChart data={chart.status} margin={{ top: 5, right: 5, left: -24, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
-                    <XAxis dataKey="name" tick={{ fill: "#78716c", fontSize: 9 }} axisLine={false} tickLine={false} interval={0} />
-                    <YAxis tick={{ fill: "#78716c", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip contentStyle={{ borderRadius: 4, border: "1px solid #e7e5e4", fontSize: 11 }} />
-                    <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+                    <XAxis dataKey="name" tick={{ ...AXIS_TICK, fontSize: 10 }} axisLine={false} tickLine={false} interval={0} />
+                    <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={32}>
                       {chart.status.map((s, i) => <Cell key={i} fill={s.fill} />)}
                     </Bar>
                   </BarChart>
@@ -513,91 +559,96 @@ export default function MyAnalyticsPage() {
             </div>
           </div>
 
-          <div className="bg-white border border-stone-200 shadow-sm p-4">
-            <ChartTitle>Service Mix</ChartTitle>
-            <div className="h-48">
-              {chart.services.length ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={chart.services} cx="50%" cy="50%" innerRadius={38} outerRadius={65} paddingAngle={2} dataKey="value">
-                      {chart.services.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip contentStyle={{ borderRadius: 4, border: "1px solid #e7e5e4", fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : <Empty />}
-            </div>
+          <div className={`${PANEL} p-5`}>
+            <ChartTitle title="Service mix" sub="What clients ask for" />
+            {chart.services.length ? (
+              <div className="h-52 flex items-center gap-4">
+                <div className="w-28 h-28 shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={chart.services} cx="50%" cy="50%" innerRadius={34} outerRadius={54} paddingAngle={2} dataKey="value" stroke="none">
+                        {chart.services.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip contentStyle={TOOLTIP_STYLE} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <ul className="flex-1 min-w-0 space-y-2">
+                  {chart.services.map((s, i) => (
+                    <li key={s.name} className="flex items-center gap-2 text-xs">
+                      <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                      <span className="text-stone-700 truncate flex-1">{s.name}</span>
+                      <span className="text-stone-900 font-medium tabular-nums">{s.value}</span>
+                      <span className="text-stone-400 tabular-nums w-9 text-right">
+                        {serviceTotal ? Math.round((s.value / serviceTotal) * 100) : 0}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="h-52"><Empty /></div>
+            )}
           </div>
         </div>
 
-        {/* TABLE / CARDS */}
-        <div className="bg-white border border-stone-200 shadow-sm">
-          <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-3 border-b border-stone-200 bg-stone-50">
-            <h3 className="text-[11px] font-bold text-black uppercase tracking-wider">
-              My Leads <span className="text-black/50 font-normal normal-case">({filteredLeads.length})</span>
+        {/* LEADS */}
+        <div className={`${PANEL} overflow-hidden`}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
+            <h3 className="text-sm font-semibold">
+              My leads
+              <span className="ml-2 text-stone-400 font-normal tabular-nums">{filteredLeads.length}</span>
             </h3>
           </div>
 
-          {/* Mobile Card View */}
+          {/* Mobile list */}
           <ul className="md:hidden divide-y divide-stone-100">
             {filteredLeads.length === 0 ? (
-              <li className="px-4 py-8 text-center text-xs text-black/50">
-                No leads match these filters
-              </li>
+              <li><EmptyRows onClear={activeFilterCount > 0 ? clearFilters : undefined} /></li>
             ) : filteredLeads.map((l) => {
               const source = classifyLead(l);
-              const sourceBadge =
-                source === "Both"
-                  ? { label: "Both", cls: "bg-amber-50 text-amber-700 border-amber-200" }
-                  : source === "Created"
-                  ? { label: "Created", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" }
-                  : { label: "Assigned", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
               const assignedElsewhere = source === "Created" && l.assignedTo && l.assignedTo !== me.name;
 
               return (
-                <li key={l._id} className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
+                <li key={l._id} className="p-4 space-y-2.5">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-semibold text-black text-sm truncate">{l.fullName}</p>
-                      <p className="text-xs text-black/60 truncate">{l.email}</p>
+                      <p className="font-medium text-sm truncate">{l.fullName}</p>
+                      <p className="text-xs text-stone-500 truncate">{l.email}</p>
                     </div>
-                    <Pill status={l.status} />
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                    <span className={`px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider border ${sourceBadge.cls}`}>
-                      {sourceBadge.label}
-                    </span>
-                    <span className="text-black/60 truncate">{l.serviceCategory || "General"}</span>
-                    <span className="text-black/40 ml-auto">{new Date(l.createdAt).toLocaleDateString()}</span>
+                    <StatusLabel status={l.status} />
                   </div>
 
-                  <div className="text-[11px] flex items-center gap-1.5">
-                    <span className="text-black/50">Assigned to:</span>
-                    {l.assignedTo ? (
-                      <div className="flex flex-col">
-                        <span className={`font-medium ${l.assignedTo === me.name ? "text-emerald-700" : "text-black/80"}`}>
-                          {l.assignedTo}
-                        </span>
-                        {assignedElsewhere && <span className="text-[9px] text-amber-700">(handed off)</span>}
-                      </div>
-                    ) : (
-                      <span className="text-stone-400 italic">Unassigned</span>
-                    )}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
+                    <SourceLabel source={source} />
+                    <span className="truncate">{l.serviceCategory || "General"}</span>
+                    <span className="ml-auto text-stone-400 tabular-nums">{new Date(l.createdAt).toLocaleDateString()}</span>
                   </div>
+
+                  <p className="text-xs text-stone-500">
+                    Assigned to{" "}
+                    {l.assignedTo ? (
+                      <span className={l.assignedTo === me.name ? "font-medium text-stone-900" : "text-stone-700"}>
+                        {l.assignedTo}
+                        {assignedElsewhere && <span className="ml-1 text-amber-700">(handed off)</span>}
+                      </span>
+                    ) : (
+                      <span className="text-stone-400">nobody yet</span>
+                    )}
+                  </p>
                 </li>
               );
             })}
           </ul>
 
-          {/* Desktop Table View */}
+          {/* Desktop table */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-stone-50 z-10">
+              <thead className="bg-stone-50">
                 <tr className="border-b border-stone-200 text-left">
                   <Th>Client</Th>
                   <Th>Source</Th>
-                  <Th>Assigned To</Th>
+                  <Th>Assigned to</Th>
                   <Th>Status</Th>
                   <Th>Service</Th>
                   <Th>Date</Th>
@@ -606,46 +657,36 @@ export default function MyAnalyticsPage() {
               <tbody className="divide-y divide-stone-100">
                 {filteredLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-xs text-black/50">
-                      No leads match these filters
+                    <td colSpan={6}>
+                      <EmptyRows onClear={activeFilterCount > 0 ? clearFilters : undefined} />
                     </td>
                   </tr>
                 ) : filteredLeads.map((l) => {
                   const source = classifyLead(l);
-                  const sourceBadge =
-                    source === "Both"
-                      ? { label: "Both", cls: "bg-amber-50 text-amber-700 border-amber-200" }
-                      : source === "Created"
-                      ? { label: "Created", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" }
-                      : { label: "Assigned", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
                   const assignedElsewhere = source === "Created" && l.assignedTo && l.assignedTo !== me.name;
 
                   return (
-                    <tr key={l._id} className="hover:bg-stone-50/50">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-black text-[13px] leading-tight">{l.fullName}</div>
-                        <div className="text-[10.5px] text-black/60">{l.email}</div>
+                    <tr key={l._id} className="hover:bg-stone-50 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="font-medium text-[13px] leading-tight">{l.fullName}</div>
+                        <div className="text-xs text-stone-500 mt-0.5">{l.email}</div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider border ${sourceBadge.cls}`}>
-                          {sourceBadge.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
+                      <td className="px-5 py-3"><SourceLabel source={source} /></td>
+                      <td className="px-5 py-3">
                         {l.assignedTo ? (
                           <div className="flex flex-col">
-                            <span className={`text-[11px] ${l.assignedTo === me.name ? "text-emerald-700 font-semibold" : "text-black/80"}`}>
+                            <span className={`text-[13px] ${l.assignedTo === me.name ? "font-medium text-stone-900" : "text-stone-700"}`}>
                               {l.assignedTo}
                             </span>
-                            {assignedElsewhere && <span className="text-[9px] text-amber-700">(handed off)</span>}
+                            {assignedElsewhere && <span className="text-[11px] text-amber-700">Handed off</span>}
                           </div>
                         ) : (
-                          <span className="text-[10px] text-stone-400 italic">Unassigned</span>
+                          <span className="text-[13px] text-stone-400">Unassigned</span>
                         )}
                       </td>
-                      <td className="px-4 py-3"><Pill status={l.status} /></td>
-                      <td className="px-4 py-3 text-[11px] text-black">{l.serviceCategory}</td>
-                      <td className="px-4 py-3 text-[11px] text-black/60">
+                      <td className="px-5 py-3"><StatusLabel status={l.status} /></td>
+                      <td className="px-5 py-3 text-[13px] text-stone-700">{l.serviceCategory}</td>
+                      <td className="px-5 py-3 text-[13px] text-stone-500 tabular-nums whitespace-nowrap">
                         {new Date(l.createdAt).toLocaleDateString()}
                       </td>
                     </tr>
@@ -661,39 +702,81 @@ export default function MyAnalyticsPage() {
 }
 
 // ── Helpers ────────────────────────────────────────────────
-function SplitCard({ label, value, hint, color }: { label: string; value: number | string; hint: string; color: string }) {
+function Stat({ label, value, hint }: { label: string; value: number | string; hint: string }) {
   return (
-    <div className="bg-white border border-stone-200 shadow-sm p-3 sm:p-4 rounded-xl flex flex-col justify-center">
-      <p className="text-[10px] font-bold text-black/50 uppercase tracking-wider truncate">{label}</p>
-      <p className={`text-xl sm:text-2xl font-bold mt-1 ${color}`}>{value}</p>
-      <p className="text-[9.5px] text-black/50 mt-0.5 truncate">{hint}</p>
+    <div className="bg-white p-4 sm:p-5">
+      <p className="text-xs text-stone-500">{label}</p>
+      <p className="text-2xl sm:text-[28px] font-semibold tracking-tight tabular-nums mt-1.5 text-stone-900">{value}</p>
+      <p className="text-[11px] text-stone-400 mt-2 truncate">{hint}</p>
     </div>
   );
 }
 
-function ChartTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-[10.5px] font-bold text-black/70 uppercase tracking-wider mb-3">{children}</h3>;
+function ChartTitle({ title, sub }: { title: string; sub: string }) {
+  return (
+    <div className="mb-4">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <p className="text-xs text-stone-500 mt-0.5">{sub}</p>
+    </div>
+  );
 }
 
 function Th({ children }: { children?: React.ReactNode }) {
-  return <th className="px-4 py-2.5 text-[10px] font-bold text-black uppercase tracking-wider">{children}</th>;
+  return <th className="px-5 py-2.5 text-xs font-medium text-stone-500">{children}</th>;
 }
 
-function Pill({ status }: { status: string }) {
+const SOURCE_DOT = {
+  Created: "bg-indigo-600",
+  Assigned: "bg-teal-600",
+  Both: "bg-amber-500",
+} as const;
+
+function SourceLabel({ source }: { source: "Created" | "Assigned" | "Both" }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-stone-700 whitespace-nowrap">
+      <span className={`w-1.5 h-1.5 rounded-full ${SOURCE_DOT[source]}`} />
+      {source}
+    </span>
+  );
+}
+
+function StatusLabel({ status }: { status: string }) {
   const map: Record<string, string> = {
-    Approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    "Not Interested": "bg-rose-50 text-rose-700 border-rose-200",
-    Interested: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    "Call Back": "bg-purple-50 text-purple-700 border-purple-200",
-    Pending: "bg-amber-50 text-amber-700 border-amber-200",
+    Approved: "bg-emerald-50 text-emerald-800 ring-emerald-600/20",
+    "Not Interested": "bg-red-50 text-red-800 ring-red-600/20",
+    Interested: "bg-indigo-50 text-indigo-800 ring-indigo-600/20",
+    "Call Back": "bg-violet-50 text-violet-800 ring-violet-600/20",
+    Pending: "bg-amber-50 text-amber-800 ring-amber-600/20",
   };
   return (
-    <span className={`px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider border ${map[status] || "bg-stone-100 text-black border-stone-200"}`}>
+    <span
+      className={`inline-flex items-center shrink-0 px-2 py-0.5 text-xs font-medium rounded-md ring-1 ring-inset whitespace-nowrap ${
+        map[status] || "bg-stone-100 text-stone-700 ring-stone-500/20"
+      }`}
+    >
       {status}
     </span>
   );
 }
 
 function Empty() {
-  return <div className="h-full flex items-center justify-center text-[11px] text-black/40">No data</div>;
+  return (
+    <div className="h-full flex items-center justify-center text-xs text-stone-400">
+      No data for these filters
+    </div>
+  );
+}
+
+function EmptyRows({ onClear }: { onClear?: () => void }) {
+  return (
+    <div className="px-4 py-14 text-center">
+      <p className="text-sm font-medium text-stone-800">No leads match these filters</p>
+      <p className="text-[13px] text-stone-500 mt-1">Try a wider date range or a different status.</p>
+      {onClear && (
+        <button onClick={onClear} className={`${BTN_SECONDARY} mt-4`}>
+          Clear filters
+        </button>
+      )}
+    </div>
+  );
 }
