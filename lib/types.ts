@@ -31,7 +31,7 @@ export interface SubmissionLocation {
 
 export interface InquiryData {
   serviceCategory?: ServiceCategory;
-  fullName: string;
+  fullName?: string;
   email: string;
   phone: string;
   clientType: ClientType;

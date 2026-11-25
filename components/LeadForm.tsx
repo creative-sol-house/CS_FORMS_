@@ -126,7 +126,7 @@ export default function LeadForm({
   const stepErrors = useMemo(() => {
     const e: Record<string, string> = {};
     if (step >= 1) {
-      if (!data.fullName?.trim()) e.fullName = "Required";
+      if (!data.companyName?.trim()) e.companyName = "Required";
       if (!data.email?.trim()) e.email = "Required";
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "Invalid email";
       if (!data.phone?.trim()) e.phone = "Required";
@@ -370,7 +370,7 @@ function StepClient({
     <div className="space-y-5">
       <SectionHeader title="Client information" subtitle="Basic details so we can reach them." />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Full name" required error={errors.fullName}>
+        <Field label="Full name"  >
           <TextInput value={data.fullName || ""} onChange={(v) => set("fullName", v)} placeholder="Jane Doe" autoFocus />
         </Field>
         <Field label="Client type" required>
@@ -411,8 +411,8 @@ function StepClient({
           />
         </Field>
 
-        <Field label="Company name">
-          <TextInput value={data.companyName || ""} onChange={(v) => set("companyName", v)} placeholder="Acme Inc." />
+        <Field label="Company name required" required error={errors.companyName}>
+          <TextInput value={data.companyName || ""} onChange={(v) => set("companyName", v)} placeholder="Acme Inc. " />
         </Field>
 
         {/* ✅ Job Title */}

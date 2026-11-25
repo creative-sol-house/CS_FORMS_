@@ -200,7 +200,7 @@ export function passwordChangedEmail(name: string, newPassword: string) {
 
 export function leadAssignedEmail(
   name: string,
-  lead: { fullName: string; email: string; phone: string; serviceCategory?: string; status?: string }
+  lead: { fullName?: string; email: string; phone: string; serviceCategory?: string; status?: string }
 ) {
   const content = `
     <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 22px; font-weight: 600;">New Lead Assigned</h2>
@@ -212,7 +212,7 @@ export function leadAssignedEmail(
       <tr>
         <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; width: 50%;">
           <span style="display: block; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Client Name</span>
-          <span style="display: block; color: #0f172a; font-size: 15px; font-weight: 500;">${lead.fullName}</span>
+          <span style="display: block; color: #0f172a; font-size: 15px; font-weight: 500;">${lead.fullName || "Not provided"}</span>
         </td>
         <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; width: 50%;">
           <span style="display: block; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Service Requested</span>
@@ -244,7 +244,7 @@ export function leadAssignedEmail(
     </a>
   `;
   return {
-    subject: `New Lead: ${lead.fullName} (${lead.serviceCategory || "General"})`,
+    subject: `New Lead: ${lead.fullName || "Name not provided"} (${lead.serviceCategory || "General"})`,
     html: emailWrapper(content),
   };
 }
@@ -254,8 +254,15 @@ export function leadAssignedEmail(
 export function leadCreatedByDeveloperEmail(
   adminName: string,
   creatorName: string,
-  lead: { fullName: string; email: string; phone: string; serviceCategory?: string }
+  lead: {
+    fullName?: string;
+    email: string;
+    phone: string;
+    serviceCategory?: string;
+  }
 ) {
+  const clientName = lead.fullName?.trim() || "Not provided";
+
   const content = `
     <h2 style="margin:0 0 16px;color:#0f172a;font-size:22px;font-weight:600;">New Lead Added by Team Member</h2>
     <p style="margin:0 0 24px;color:#475569;font-size:15px;line-height:1.6;">
@@ -264,7 +271,7 @@ export function leadCreatedByDeveloperEmail(
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:24px;">
       <tr><td style="padding:16px;border-bottom:1px solid #e2e8f0;">
         <span style="display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:600;">Client</span>
-        <span style="color:#0f172a;font-size:15px;font-weight:500;">${lead.fullName}</span>
+        <span style="color:#0f172a;font-size:15px;font-weight:500;">${clientName}</span>
       </td></tr>
       <tr><td style="padding:16px;border-bottom:1px solid #e2e8f0;">
         <span style="display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:600;">Email</span>
@@ -283,8 +290,9 @@ export function leadCreatedByDeveloperEmail(
        style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;">
       Review in Dashboard
     </a>`;
+
   return {
-    subject: `New lead from ${creatorName}: ${lead.fullName}`,
+    subject: `New lead from ${creatorName}: ${clientName}`,
     html: emailWrapper(content),
   };
 }
