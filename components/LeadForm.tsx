@@ -7,6 +7,7 @@ import {
   RequirementType,
   CommunicationMode,
   LeadAttachment,
+  SocialLink,
 } from "@/lib/types";
 import FileUpload from "@/components/FileUpload";
 
@@ -19,6 +20,59 @@ const SERVICES: { value: ServiceCategory; label: string; desc: string }[] = [
 
 const CONTACT_METHODS: CommunicationMode[] = [
   "Call", "WhatsApp Msg", "WhatsApp Call", "Text Msg", "Email", "Zoom Meeting", "Onsite Meeting",
+];
+
+/* ✅ NEW: Common social platforms for the dropdown */
+const SOCIAL_PLATFORMS = [
+  "Facebook",
+  "Instagram",
+  "LinkedIn",
+  "Twitter / X",
+  "YouTube",
+  "TikTok",
+  "WhatsApp",
+  "Telegram",
+  "Pinterest",
+  "Snapchat",
+  "Threads",
+  "Reddit",
+  "Other",
+];
+
+/* ✅ NEW: All countries (ISO names) */
+const COUNTRIES = [
+  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda",
+  "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain",
+  "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan",
+  "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria",
+  "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada",
+  "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros",
+  "Congo (Congo-Brazzaville)", "Costa Rica", "Croatia", "Cuba", "Cyprus",
+  "Czechia (Czech Republic)", "Democratic Republic of the Congo", "Denmark",
+  "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador",
+  "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji",
+  "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece",
+  "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras",
+  "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel",
+  "Italy", "Ivory Coast", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya",
+  "Kiribati", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho",
+  "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar",
+  "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands",
+  "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco",
+  "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia",
+  "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria",
+  "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau",
+  "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines",
+  "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis",
+  "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino",
+  "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles",
+  "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia",
+  "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan",
+  "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania",
+  "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia",
+  "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates",
+  "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City",
+  "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe",
 ];
 
 interface Props {
@@ -51,14 +105,15 @@ export default function LeadForm({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
-const [data, setData] = useState<Partial<InquiryData>>(() => ({
-  clientType: "Business",
-  consultantName,
-  agreeToTerms: true,
-  subscribeUpdates: false,
-  leadCreatedAt: initialData?.leadCreatedAt || new Date().toISOString(),
-  ...initialData,
-}));
+  const [data, setData] = useState<Partial<InquiryData>>(() => ({
+    clientType: "Business",
+    consultantName,
+    agreeToTerms: true,
+    subscribeUpdates: false,
+    leadCreatedAt: initialData?.leadCreatedAt || new Date().toISOString(),
+    socialLinks: initialData?.socialLinks || [],
+    ...initialData,
+  }));
 
   const [attachments, setAttachments] = useState<LeadAttachment[]>(
     () => (initialData?.attachments as LeadAttachment[] | undefined) ?? []
@@ -66,7 +121,6 @@ const [data, setData] = useState<Partial<InquiryData>>(() => ({
 
   const set = <K extends keyof InquiryData>(k: K, v: InquiryData[K]) =>
     setData((d) => ({ ...d, [k]: v }));
-
 
   const stepErrors = useMemo(() => {
     const e: Record<string, string> = {};
@@ -76,6 +130,7 @@ const [data, setData] = useState<Partial<InquiryData>>(() => ({
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "Invalid email";
       if (!data.phone?.trim()) e.phone = "Required";
       else if (!/^[+\d][\d\s\-()]{5,}$/.test(data.phone)) e.phone = "Invalid phone";
+      if (!data.country?.trim()) e.country = "Required";
     }
     return e;
   }, [data, step]);
@@ -85,15 +140,23 @@ const [data, setData] = useState<Partial<InquiryData>>(() => ({
     setSaving(true);
     setErr("");
     try {
-      const body = {
-        ...data,
-        attachments, // ← added
-        serviceCategory,
-        consultantName: isEdit ? data.consultantName || consultantName : consultantName,
-        consultantId:  isEdit ? data.consultantId  || consultantId  : consultantId,
-        createdBy:   data.createdBy  || consultantName,
-        createdById: data.createdById || consultantId,
-      };
+// ✅ International client detection — snapshot at save time
+const LOCAL_COUNTRY = "Pakistan";
+const isInternationalClient =
+  !!data.country && data.country.trim() !== "" && data.country.trim() !== LOCAL_COUNTRY;
+
+const body = {
+  ...data,
+  country: data.country?.trim() || "",
+  attachments,
+  serviceCategory,
+  isInternationalClient,
+  clientRegion: isInternationalClient ? "International" : "Local",
+  consultantName: isEdit ? data.consultantName || consultantName : consultantName,
+  consultantId:  isEdit ? data.consultantId  || consultantId  : consultantId,
+  createdBy:   data.createdBy  || consultantName,
+  createdById: data.createdById || consultantId,
+};
 
       const res = isEdit
         ? await fetch("/api/admin/inquiries", {
@@ -130,9 +193,7 @@ const [data, setData] = useState<Partial<InquiryData>>(() => ({
       role="dialog"
       aria-modal="true"
     >
-      {/* Backdrop — intentionally NOT clickable. The user must use the X, Cancel,
-    or Back button to close, so an accidental outside click never loses data. */}
-<div className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm" aria-hidden="true" />
+      <div className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm" aria-hidden="true" />
 
       <div className="relative w-full sm:max-w-3xl bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[94vh] ring-1 ring-stone-900/5">
         {/* Header */}
@@ -190,11 +251,11 @@ const [data, setData] = useState<Partial<InquiryData>>(() => ({
           )}
           {step === 1 && <StepClient data={data} set={set} errors={stepErrors} />}
           {step === 2 && serviceCategory && (
-     <StepServiceDetails
-  service={serviceCategory}
-  data={data}
-  set={set}
-/>
+            <StepServiceDetails
+              service={serviceCategory}
+              data={data}
+              set={set}
+            />
           )}
           {step === 3 && <StepAttachments value={attachments} onChange={setAttachments} />}
           {step === 4 && (
@@ -312,11 +373,11 @@ function StepClient({
           <TextInput value={data.fullName || ""} onChange={(v) => set("fullName", v)} placeholder="Jane Doe" autoFocus />
         </Field>
         <Field label="Client type" required>
-       <Select
-  value={data.clientType || "Business"}
-  onChange={(v) => set("clientType", v as ClientType)}
-  options={[{ value: "Individual", label: "Individual" }, { value: "Business", label: "Business" }]}
-/>
+          <Select
+            value={data.clientType || "Business"}
+            onChange={(v) => set("clientType", v as ClientType)}
+            options={[{ value: "Individual", label: "Individual" }, { value: "Business", label: "Business" }]}
+          />
         </Field>
         <Field label="Email" required error={errors.email}>
           <TextInput type="email" value={data.email || ""} onChange={(v) => set("email", v)} placeholder="jane@company.com" />
@@ -324,20 +385,92 @@ function StepClient({
         <Field label="Phone" required error={errors.phone}>
           <TextInput type="tel" value={data.phone || ""} onChange={(v) => set("phone", v)} placeholder="+1 555 123 4567" />
         </Field>
+
+<Field label="Country" required error={errors.country}>
+  <SearchableSelect
+    value={data.country || ""}
+    onChange={(v) => set("country", v)}
+    options={COUNTRIES}
+    placeholder="Search country…"
+  />
+  {data.country && data.country !== "Pakistan" && (
+    <p className="mt-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-flex items-center gap-1">
+      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+      Will be tagged as <strong>International Client</strong>
+    </p>
+  )}
+</Field>
+
+        {/* ✅ Location */}
+        <Field label="Location (City / Region)">
+          <TextInput
+            value={data.location || ""}
+            onChange={(v) => set("location", v)}
+            placeholder="e.g. Karachi, Sindh"
+          />
+        </Field>
+
         <Field label="Company name">
           <TextInput value={data.companyName || ""} onChange={(v) => set("companyName", v)} placeholder="Acme Inc." />
         </Field>
+
+        {/* ✅ Job Title */}
+        <Field label="Job Title">
+          <TextInput
+            value={data.jobTitle || ""}
+            onChange={(v) => set("jobTitle", v)}
+            placeholder="e.g. Marketing Manager"
+          />
+        </Field>
+
         <Field label="Designation">
           <TextInput value={data.designation || ""} onChange={(v) => set("designation", v)} placeholder="Marketing Head" />
         </Field>
+
+        {/* ✅ Company Website */}
+        <Field label="Company Website">
+          <TextInput
+            type="url"
+            value={data.companyWebsite || ""}
+            onChange={(v) => set("companyWebsite", v)}
+            placeholder="https://company.com"
+          />
+        </Field>
+
         <Field label="Lead Created" required>
-  <input
-    type="datetime-local"
-    value={toDatetimeLocal(data.leadCreatedAt)}
-    onChange={(e) => set("leadCreatedAt", new Date(e.target.value).toISOString())}
-    className={`${inputBase} border-stone-300 hover:border-stone-400`}
-  />
-</Field>
+          <input
+            type="datetime-local"
+            value={toDatetimeLocal(data.leadCreatedAt)}
+            onChange={(e) => set("leadCreatedAt", new Date(e.target.value).toISOString())}
+            className={`${inputBase} border-stone-300 hover:border-stone-400`}
+          />
+        </Field>
+      </div>
+
+      {/* ✅ Social links — full-width, dropdown + custom */}
+      <div>
+        <SectionHeader title="Social Links" subtitle="Add platform names and their URLs (if no website)." />
+        <div className="mt-3">
+          <SocialLinksInput
+            value={data.socialLinks}
+            onChange={(v) => set("socialLinks", v)}
+          />
+        </div>
+      </div>
+
+      {/* ✅ Client requirements */}
+      <div>
+        <SectionHeader title="Client Requirements" subtitle="What does the client need?" />
+        <div className="mt-3">
+          <Field label="Requirements description">
+            <TextArea
+              value={data.clientRequirements || ""}
+              onChange={(v) => set("clientRequirements", v)}
+              placeholder="Describe what the client is looking for…"
+              rows={4}
+            />
+          </Field>
+        </div>
       </div>
     </div>
   );
@@ -375,9 +508,8 @@ function FeaturesInput({
   placeholder?: string;
 }) {
   const [text, setText] = useState(() => (value || []).join(", "));
-  const isFocused = useRef(false); // Prevent parent from overwriting while typing
+  const isFocused = useRef(false);
 
-  // Only sync from parent if we are NOT currently typing in the box
   useEffect(() => {
     if (!isFocused.current) {
       setText((value || []).join(", "));
@@ -389,13 +521,11 @@ function FeaturesInput({
       value={text}
       onFocus={() => { isFocused.current = true; }}
       onChange={(v) => {
-        setText(v); // Always update local text immediately
-        // Send the array to the parent in the background
+        setText(v);
         onChange(v.split(",").map((s) => s.trim()).filter(Boolean));
       }}
       onBlur={() => {
         isFocused.current = false;
-        // Clean up the text format when they click away (e.g. "a, b, c")
         const cleaned = text.split(",").map((s) => s.trim()).filter(Boolean).join(", ");
         setText(cleaned);
         onChange(text.split(",").map((s) => s.trim()).filter(Boolean));
@@ -406,7 +536,7 @@ function FeaturesInput({
 }
 
 function AutomationFields({ data, set }: any) {
-    return (
+  return (
     <div className="space-y-6">
       <div>
         <SectionHeader title="Project overview" subtitle="What's the requirement?" />
@@ -431,13 +561,13 @@ function AutomationFields({ data, set }: any) {
             <TextArea value={data.projectGoals || ""} onChange={(v) => set("projectGoals", v)} placeholder="What should this automation achieve?" />
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-           <Field label="Number Of Users">
-  <TextInput
-    value={data.targetAudience || ""}
-    onChange={(v) => set("targetAudience", v.replace(/[^0-9]/g, ""))}
-    placeholder="Enter number of users"
-  />
-</Field>
+            <Field label="Number Of Users">
+              <TextInput
+                value={data.targetAudience || ""}
+                onChange={(v) => set("targetAudience", v.replace(/[^0-9]/g, ""))}
+                placeholder="Enter number of users"
+              />
+            </Field>
             <Field label="Existing website">
               <TextInput value={data.existingWebsite || ""} onChange={(v) => set("existingWebsite", v)} placeholder="https://…" />
             </Field>
@@ -457,13 +587,13 @@ function AutomationFields({ data, set }: any) {
             </Field>
           </div>
           <div className="mt-4 space-y-4">
-         <Field label="Features (comma separated)">
-  <FeaturesInput
-    value={data.commodityFeatures}
-    onChange={(v) => set("commodityFeatures", v)}
-    placeholder="Feature A, Feature B, Feature C"
-  />
-</Field>
+            <Field label="Features (comma separated)">
+              <FeaturesInput
+                value={data.commodityFeatures}
+                onChange={(v) => set("commodityFeatures", v)}
+                placeholder="Feature A, Feature B, Feature C"
+              />
+            </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Delivery terms">
                 <TextInput value={data.commodityDelivery || ""} onChange={(v) => set("commodityDelivery", v)} />
@@ -491,12 +621,12 @@ function AutomationFields({ data, set }: any) {
             <Field label="Project description">
               <TextArea value={data.projectDescription || ""} onChange={(v) => set("projectDescription", v)} />
             </Field>
-        <Field label="Service features (comma separated)">
-  <FeaturesInput
-    value={data.serviceFeatures}
-    onChange={(v) => set("serviceFeatures", v)}
-  />
-</Field>
+            <Field label="Service features (comma separated)">
+              <FeaturesInput
+                value={data.serviceFeatures}
+                onChange={(v) => set("serviceFeatures", v)}
+              />
+            </Field>
             <Field label="References">
               <TextInput value={data.serviceRefs || ""} onChange={(v) => set("serviceRefs", v)} />
             </Field>
@@ -524,13 +654,13 @@ function WebDevFields({ data, set }: any) {
           <Field label="Project goals">
             <TextArea value={data.projectGoals || ""} onChange={(v) => set("projectGoals", v)} />
           </Field>
-        <Field label="Number Of Users">
-  <TextInput
-    value={data.targetAudience || ""}
-    onChange={(v) => set("targetAudience", v.replace(/[^0-9]/g, ""))}
-    placeholder="Enter number of users"
-  />
-</Field>
+          <Field label="Number Of Users">
+            <TextInput
+              value={data.targetAudience || ""}
+              onChange={(v) => set("targetAudience", v.replace(/[^0-9]/g, ""))}
+              placeholder="Enter number of users"
+            />
+          </Field>
         </div>
       </div>
       <div>
@@ -708,13 +838,38 @@ function StepReview({
           <Summary label="Type" value={data.clientType || "—"} />
           <Summary label="Email" value={data.email || "—"} />
           <Summary label="Phone" value={data.phone || "—"} />
+          <Summary label="Country" value={data.country || "—"} />
+          <Summary label="Location" value={data.location || "—"} />
           <Summary label="Company" value={data.companyName || "—"} />
+          <Summary label="Job Title" value={data.jobTitle || "—"} />
           <Summary label="Designation" value={data.designation || "—"} />
+          <Summary label="Website" value={data.companyWebsite || "—"} />
+
+          {/* ✅ Social links list */}
+          <div className="flex flex-col">
+            <dt className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Social Links</dt>
+            <dd className="mt-0.5 text-stone-800">
+              {data.socialLinks && data.socialLinks.length > 0 ? (
+                <ul className="space-y-0.5">
+                  {data.socialLinks.map((l, i) => (
+                    <li key={i} className="text-sm">
+                      <span className="font-medium">{l.name || "—"}:</span>{" "}
+                      <span className="break-all">{l.url || "—"}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+
+          <Summary label="Requirements" value={data.clientRequirements || "—"} />
           <Summary label="Attachments" value={`${attachments.length} file(s)`} />
           <Summary
-  label="Lead Created"
-  value={data.leadCreatedAt ? new Date(data.leadCreatedAt).toLocaleString() : "—"}
-/>
+            label="Lead Created"
+            value={data.leadCreatedAt ? new Date(data.leadCreatedAt).toLocaleString() : "—"}
+          />
         </dl>
       </div>
     </div>
@@ -747,12 +902,12 @@ function Field({ label, required, error, children }: { label: string; required?:
 const inputBase = "w-full px-3.5 py-2.5 text-sm text-stone-900 bg-white rounded-lg border transition-colors placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500";
 
 function TextInput({ value, onChange, onBlur, onFocus, placeholder, type = "text", autoFocus }: {
-  value: string; 
-  onChange: (v: string) => void; 
-  onBlur?: () => void; 
-  onFocus?: () => void; // ← Add this
-  placeholder?: string; 
-  type?: string; 
+  value: string;
+  onChange: (v: string) => void;
+  onBlur?: () => void;
+  onFocus?: () => void;
+  placeholder?: string;
+  type?: string;
   autoFocus?: boolean;
 }) {
   return (
@@ -761,7 +916,7 @@ function TextInput({ value, onChange, onBlur, onFocus, placeholder, type = "text
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
-      onFocus={onFocus} // ← Add this
+      onFocus={onFocus}
       placeholder={placeholder}
       autoFocus={autoFocus}
       className={`${inputBase} border-stone-300 hover:border-stone-400`}
@@ -913,6 +1068,241 @@ function Select({ value, onChange, options, placeholder = "Select…" }: {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function SearchableSelect({
+  value,
+  onChange,
+  options,
+  placeholder = "Search…",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [highlight, setHighlight] = useState(0);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => o.toLowerCase().includes(q));
+  }, [options, query]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) setHighlight(0);
+  }, [query, open]);
+
+  const commit = (val: string) => {
+    onChange(val);
+    setOpen(false);
+    setQuery("");
+    inputRef.current?.blur();
+  };
+
+  return (
+    <div ref={wrapRef} className="relative">
+          <input
+        ref={inputRef}
+        value={open ? query : value}
+        onChange={(e) => {
+          const val = e.target.value;
+          if (!open) setOpen(true);
+          setQuery(val);
+          // ✅ UPDATE PARENT IMMEDIATELY AS THEY TYPE
+          onChange(val); 
+        }}
+        onFocus={() => {
+          setOpen(true);
+          // Seed query with current value so the filter starts from what's selected
+          setQuery(value ? "" : "");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setOpen(true);
+            setHighlight((h) => Math.min(h + 1, filtered.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setHighlight((h) => Math.max(h - 1, 0));
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            // If a filtered option is highlighted, pick it; else allow free-text
+            if (open && filtered[highlight]) commit(filtered[highlight]);
+            else if (query.trim()) commit(query.trim());
+          } else if (e.key === "Escape") {
+            setOpen(false);
+            setQuery("");
+          }
+        }}
+               onBlur={() => {
+          setOpen(false);
+          setQuery("");
+        }}
+        placeholder={placeholder}
+        className={`${inputBase} border-stone-300 hover:border-stone-400 ${
+          open ? "border-indigo-500 ring-2 ring-indigo-500/30" : ""
+        }`}
+      />
+      <svg
+        className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none transition-transform duration-200 ${
+          open ? "rotate-180" : ""
+        }`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        viewBox="0 0 24 24"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
+      {open && (
+        <div className="absolute z-30 mt-1.5 w-full max-h-64 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-xl ring-1 ring-black/5">
+          {filtered.length === 0 ? (
+            <p className="px-3.5 py-3 text-sm text-stone-400">No matches</p>
+          ) : (
+            filtered.map((opt, i) => {
+              const isActive = i === highlight;
+              const isSelected = opt === value;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onMouseEnter={() => setHighlight(i)}
+                  onClick={() => commit(opt)}
+                  className={`w-full text-left px-3.5 py-2.5 text-sm flex items-center justify-between gap-2 transition-colors ${
+                    isActive ? "bg-indigo-50 text-indigo-900" : "text-stone-700"
+                  }`}
+                >
+                  <span>{opt}</span>
+                  {isSelected && (
+                    <svg
+                      className="w-4 h-4 text-indigo-600 shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ✅ NEW: Social Links — dropdown for platform + custom option */
+function SocialLinksInput({
+  value,
+  onChange,
+}: {
+  value: SocialLink[] | undefined;
+  onChange: (v: SocialLink[]) => void;
+}) {
+  const links = value || [];
+
+  const updateLink = (idx: number, patch: Partial<SocialLink>) => {
+    const next = links.map((l, i) => (i === idx ? { ...l, ...patch } : l));
+    onChange(next);
+  };
+
+  const addLink = () => {
+    onChange([...links, { name: "", url: "" }]);
+  };
+
+  const removeLink = (idx: number) => {
+    onChange(links.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="space-y-2">
+      {links.length === 0 && (
+        <p className="text-xs text-stone-400 italic">No social links added yet.</p>
+      )}
+
+      {links.map((link, idx) => (
+        <div key={idx} className="flex items-start gap-2">
+          {/* Platform dropdown */}
+          <div className="w-40 shrink-0">
+            <Select
+              value={link.name}
+              onChange={(v) => {
+                if (v === "Other") {
+                  updateLink(idx, { name: "" });
+                } else {
+                  updateLink(idx, { name: v });
+                }
+              }}
+              options={[
+                { value: "", label: "Select…" },
+                ...SOCIAL_PLATFORMS.map((p) => ({ value: p, label: p })),
+              ]}
+            />
+            {/* Custom name input when "Other" or empty chosen */}
+            {(link.name === "" || link.name === "Other") && (
+              <input
+                value={link.name === "Other" ? "" : link.name}
+                onChange={(e) => updateLink(idx, { name: e.target.value })}
+                placeholder="Custom name"
+                className={`${inputBase} border-stone-300 hover:border-stone-400 mt-1.5`}
+              />
+            )}
+          </div>
+
+          {/* URL input */}
+          <input
+            value={link.url}
+            onChange={(e) => updateLink(idx, { url: e.target.value })}
+            placeholder="https://…"
+            className={`${inputBase} border-stone-300 hover:border-stone-400 flex-1`}
+          />
+
+          {/* Remove */}
+          <button
+            type="button"
+            onClick={() => removeLink(idx)}
+            aria-label="Remove link"
+            className="shrink-0 p-2.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={addLink}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+        Add social link
+      </button>
     </div>
   );
 }

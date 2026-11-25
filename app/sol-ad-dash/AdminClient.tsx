@@ -70,6 +70,9 @@ export default function AdminClient() {
   const [creatorFilter, setCreatorFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [onlyUnread, setOnlyUnread] = useState(false);
+  // ✅ Region filter
+  const [regionFilter, setRegionFilter] = useState<"All" | "Local" | "International">("All");
+  const [bdRegionFilter, setBdRegionFilter] = useState<"All" | "Local" | "International">("All");
 
   const [bdDateFrom, setBdDateFrom] = useState("");
   const [bdDateTo, setBdDateTo] = useState("");
@@ -146,67 +149,64 @@ export default function AdminClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-useEffect(() => {
-  if (!user) return;
-  const es = new EventSource("/api/admin/inquiries/stream");
-  es.onmessage = (e) => {
-    try {
-      const data = JSON.parse(e.data);
-      if (data.type === "snapshot") {
-        setInquiries(data.inquiries);
-        return;
-      }
-      if (data.type === "lead:update") {
-        const lead = data.lead;
-
-        // ── 1. Explicit drop signal (server says: you can no longer see this)
-        if (lead.__drop) {
-          setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
-          if (chatLead?._id === lead._id) setChatLead(null);
-          if (selected?._id === lead._id) setSelected(null);
+  useEffect(() => {
+    if (!user) return;
+    const es = new EventSource("/api/admin/inquiries/stream");
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === "snapshot") {
+          setInquiries(data.inquiries);
           return;
         }
+        if (data.type === "lead:update") {
+          const lead = data.lead;
 
-        // ── 2. Deletion signal (existing behaviour)
-        if (lead.__deleted) {
-          setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
-          if (chatLead?._id === lead._id) setChatLead(null);
-          if (selected?._id === lead._id) setSelected(null);
-          return;
+          // ── 1. Explicit drop signal (server says: you can no longer see this)
+          if (lead.__drop) {
+            setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
+            if (chatLead?._id === lead._id) setChatLead(null);
+            if (selected?._id === lead._id) setSelected(null);
+            return;
+          }
+
+          // ── 2. Deletion signal (existing behaviour)
+          if (lead.__deleted) {
+            setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
+            if (chatLead?._id === lead._id) setChatLead(null);
+            if (selected?._id === lead._id) setSelected(null);
+            return;
+          }
+
+          // ── 3. Defensive client-side visibility check.
+          const mine = user.role === "admin"
+            ? true
+            : (lead.createdById && lead.createdById === user.userId) ||
+              (lead.createdBy && lead.createdBy === user.name) ||
+              (lead.assignedTo && lead.assignedTo === user.name);
+
+          if (!mine) {
+            setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
+            if (chatLead?._id === lead._id) setChatLead(null);
+            if (selected?._id === lead._id) setSelected(null);
+            return;
+          }
+
+          // ── 4. Normal upsert
+          setInquiries((prev) => {
+            const exists = prev.some((i) => i._id === lead._id);
+            return exists
+              ? prev.map((i) => (i._id === lead._id ? lead : i))
+              : [lead, ...prev];
+          });
+          setChatLead((prev) => (prev?._id === lead._id ? lead : prev));
+          setSelected((prev) => (prev?._id === lead._id ? lead : prev));
         }
-
-        // ── 3. Defensive client-side visibility check.
-        //     Even if the server were to mis-broadcast, don't show
-        //     a lead the current user has no claim to.
-        const mine = user.role === "admin"
-          ? true
-          : (lead.createdById && lead.createdById === user.userId) ||
-            (lead.createdBy && lead.createdBy === user.name) ||
-            (lead.assignedTo && lead.assignedTo === user.name);
-
-        if (!mine) {
-          // Not visible to me — remove if it was previously shown
-          setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
-          if (chatLead?._id === lead._id) setChatLead(null);
-          if (selected?._id === lead._id) setSelected(null);
-          return;
-        }
-
-        // ── 4. Normal upsert
-        setInquiries((prev) => {
-          const exists = prev.some((i) => i._id === lead._id);
-          return exists
-            ? prev.map((i) => (i._id === lead._id ? lead : i))
-            : [lead, ...prev];
-        });
-        setChatLead((prev) => (prev?._id === lead._id ? lead : prev));
-        setSelected((prev) => (prev?._id === lead._id ? lead : prev));
-      }
-    } catch {}
-  };
-  return () => es.close();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [user]);
+      } catch {}
+    };
+    return () => es.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const login = async () => {
     setLoading(true);
@@ -384,6 +384,30 @@ useEffect(() => {
     setAddLeadOpen(false);
   };
 
+  // ✅ Lead title = company name for business leads, fallback to client name
+  const getLeadTitle = (i: InquiryDoc): string => {
+    const company = (i as any).companyName?.trim?.();
+    if (i.clientType === "Business" && company) return company;
+    return i.fullName || "Unnamed Lead";
+  };
+
+  // ✅ Secondary line under title — client name (if business) else email
+  const getLeadSubtitle = (i: InquiryDoc): string => {
+    const company = (i as any).companyName?.trim?.();
+    if (i.clientType === "Business" && company && i.fullName) {
+      return i.fullName;
+    }
+    return i.email || "";
+  };
+
+  // ✅ International check (with fallback if field missing)
+  const isInternationalLead = (i: InquiryDoc): boolean => {
+    const flagged = (i as any).isInternationalClient;
+    if (typeof flagged === "boolean") return flagged;
+    const country = (i as any).country?.trim?.();
+    return !!country && country !== "Pakistan";
+  };
+
   const getCreatorName = (i: InquiryDoc) => {
     const fromAudit = i.auditLogs?.find((l) => l.action === "Created")?.performedBy;
     return (i as any).createdBy || fromAudit || i.consultantName || "Unknown";
@@ -427,6 +451,12 @@ useEffect(() => {
     return inquiries.filter((i) => {
       if (filter !== "All" && i.serviceCategory !== filter) return false;
       if (statusFilter && i.status !== statusFilter) return false;
+      // ✅ Region filter
+      if (regionFilter !== "All") {
+        const intl = isInternationalLead(i);
+        if (regionFilter === "International" && !intl) return false;
+        if (regionFilter === "Local" && intl) return false;
+      }
       if (creatorFilter && getCreatorName(i) !== creatorFilter) return false;
       if (onlyUnread && user && unreadCountFor(i, user.name) === 0) return false;
       if (!isInDateRange(i.createdAt, dateFrom, dateTo)) return false;
@@ -436,13 +466,15 @@ useEffect(() => {
           i.fullName?.toLowerCase().includes(q) ||
           i.email?.toLowerCase().includes(q) ||
           i.phone?.toLowerCase().includes(q) ||
-          i.consultantName?.toLowerCase().includes(q)
+          i.consultantName?.toLowerCase().includes(q) ||
+          // ✅ include company name in search
+          ((i as any).companyName?.toLowerCase?.().includes(q) ?? false)
         );
       }
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inquiries, filter, statusFilter, creatorFilter, dateFrom, dateTo, search, allUsers, onlyUnread, user]);
+  }, [inquiries, filter, statusFilter, creatorFilter, dateFrom, dateTo, search, allUsers, onlyUnread, user, regionFilter]);
 
   const activeFiltersCount =
     (filter !== "All" ? 1 : 0) +
@@ -451,7 +483,9 @@ useEffect(() => {
     (dateFrom ? 1 : 0) +
     (dateTo ? 1 : 0) +
     (search ? 1 : 0) +
-    (onlyUnread ? 1 : 0);
+    (onlyUnread ? 1 : 0) +
+    // ✅
+    (regionFilter !== "All" ? 1 : 0);
 
   const clearFilters = () => {
     setFilter("All");
@@ -461,6 +495,8 @@ useEffect(() => {
     setDateTo("");
     setSearch("");
     setOnlyUnread(false);
+    // ✅
+    setRegionFilter("All");
   };
 
   const creatorOptions = useMemo(() => {
@@ -478,6 +514,13 @@ useEffect(() => {
       if (bdStatusFilter && i.status !== bdStatusFilter) return false;
       if (bdOnlyUnread && user && unreadCountFor(i, user.name) === 0) return false;
 
+      // ✅ Region filter
+      if (bdRegionFilter !== "All") {
+        const intl = isInternationalLead(i);
+        if (bdRegionFilter === "International" && !intl) return false;
+        if (bdRegionFilter === "Local" && intl) return false;
+      }
+
       if (bdOnlyMine) {
         const createdById = (i as any).createdById;
         const createdBy = (i as any).createdBy;
@@ -491,8 +534,9 @@ useEffect(() => {
       if (!isInDateRange(i.createdAt, bdDateFrom, bdDateTo)) return false;
       return true;
     });
+    // ✅ Fixed deps: was using admin deps before
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inquiries, bdServiceFilter, bdStatusFilter, bdOnlyMine, bdDateFrom, bdDateTo, bdOnlyUnread, user]);
+  }, [inquiries, bdServiceFilter, bdStatusFilter, bdOnlyMine, bdDateFrom, bdDateTo, bdOnlyUnread, user, bdRegionFilter]);
 
   const bdSummary = useMemo(() => {
     const rangeFiltered = inquiries.filter((i) =>
@@ -524,7 +568,9 @@ useEffect(() => {
     (bdOnlyMine ? 1 : 0) +
     (bdOnlyUnread ? 1 : 0) +
     (bdDateFrom ? 1 : 0) +
-    (bdDateTo ? 1 : 0);
+    (bdDateTo ? 1 : 0) +
+    // ✅
+    (bdRegionFilter !== "All" ? 1 : 0);
 
   const clearBdFilters = () => {
     setBdServiceFilter("All");
@@ -533,6 +579,8 @@ useEffect(() => {
     setBdOnlyUnread(false);
     setBdDateFrom("");
     setBdDateTo("");
+    // ✅
+    setBdRegionFilter("All");
   };
 
   const totalUnreadLeads = useMemo(
@@ -872,8 +920,14 @@ useEffect(() => {
                     <li key={i._id} className="px-3 py-2.5">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-semibold text-xs text-stone-800 truncate">{i.fullName}</p>
-                          <p className="text-[10px] text-stone-500 truncate">{i.email}</p>
+                          {/* ✅ Company-first title */}
+                          <p className="font-semibold text-xs text-stone-800 truncate flex items-center gap-1">
+                            <span className="truncate">{getLeadTitle(i)}</span>
+                            {isInternationalLead(i) && (
+                              <span className="shrink-0 px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">Intl</span>
+                            )}
+                          </p>
+                          <p className="text-[10px] text-stone-500 truncate">{getLeadSubtitle(i)}</p>
                         </div>
                         <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider border ${
                           i.status === "Approved" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
@@ -913,8 +967,14 @@ useEffect(() => {
                       return (
                         <tr key={i._id} className="hover:bg-stone-50 transition-colors">
                           <td className="px-3 py-2">
-                            <div className="font-semibold text-stone-800 text-[12px] truncate">{i.fullName}</div>
-                            <div className="text-[10px] text-stone-500 truncate">{i.email}</div>
+                            {/* ✅ Company-first title */}
+                            <div className="font-semibold text-stone-800 text-[12px] truncate flex items-center gap-1">
+                              <span className="truncate">{getLeadTitle(i)}</span>
+                              {isInternationalLead(i) && (
+                                <span className="shrink-0 px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">Intl</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-stone-500 truncate">{getLeadSubtitle(i)}</div>
                           </td>
                           <td className="px-3 py-2 text-[11px] text-stone-700 truncate">{i.serviceCategory}</td>
                           <td className="px-3 py-2">
@@ -954,7 +1014,8 @@ useEffect(() => {
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2">
+              {/* ✅ 5 cols to fit Region */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-1.5 sm:gap-2">
                 <div>
                   <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">From</label>
                   <input type="date" value={bdDateFrom} onChange={(e) => setBdDateFrom(e.target.value)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px]" />
@@ -974,6 +1035,15 @@ useEffect(() => {
                   <select value={bdStatusFilter} onChange={(e) => setBdStatusFilter(e.target.value)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px] bg-white">
                     <option value="">Any</option>
                     {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                {/* ✅ Region filter */}
+                <div>
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Region</label>
+                  <select value={bdRegionFilter} onChange={(e) => setBdRegionFilter(e.target.value as any)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px] bg-white">
+                    <option value="All">All</option>
+                    <option value="Local">Local (PK)</option>
+                    <option value="International">International</option>
                   </select>
                 </div>
               </div>
@@ -1036,8 +1106,14 @@ useEffect(() => {
                     <li key={i._id} className="px-3 py-2.5">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-semibold text-xs text-stone-800 truncate">{i.fullName}</p>
-                          <p className="text-[10px] text-stone-500 truncate">{i.email}</p>
+                          {/* ✅ Company-first title */}
+                          <p className="font-semibold text-xs text-stone-800 truncate flex items-center gap-1">
+                            <span className="truncate">{getLeadTitle(i)}</span>
+                            {isInternationalLead(i) && (
+                              <span className="shrink-0 px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">Intl</span>
+                            )}
+                          </p>
+                          <p className="text-[10px] text-stone-500 truncate">{getLeadSubtitle(i)}</p>
                         </div>
                         {unread > 0 && (
                           <span className="shrink-0 min-w-[18px] h-4.5 px-1 flex items-center justify-center rounded-full bg-rose-600 text-white text-[9px] font-bold">
@@ -1045,20 +1121,20 @@ useEffect(() => {
                           </span>
                         )}
                       </div>
-                 {i.assignedTo && (
-  <div className="mt-1 text-[10px] font-medium flex items-center gap-1 flex-wrap">
-    <span className="text-stone-500">Assigned to:</span>
-    <span className={i.assignedTo === user.name ? "text-indigo-700 font-semibold" : "text-stone-800"}>
-      {i.assignedTo}
-      {i.assignedTo === user.name ? " (you)" : ""}
-    </span>
-  </div>
-)}
-{i.assignedTo && i.assignedTo !== user.name && (
-  <div className="mt-1 text-[9px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 inline-block">
-    ⓘ You created this — now handled by {i.assignedTo}
-  </div>
-)}
+                      {i.assignedTo && (
+                        <div className="mt-1 text-[10px] font-medium flex items-center gap-1 flex-wrap">
+                          <span className="text-stone-500">Assigned to:</span>
+                          <span className={i.assignedTo === user.name ? "text-indigo-700 font-semibold" : "text-stone-800"}>
+                            {i.assignedTo}
+                            {i.assignedTo === user.name ? " (you)" : ""}
+                          </span>
+                        </div>
+                      )}
+                      {i.assignedTo && i.assignedTo !== user.name && (
+                        <div className="mt-1 text-[9px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 inline-block">
+                          ⓘ You created this — now handled by {i.assignedTo}
+                        </div>
+                      )}
                       <div className="flex items-center gap-1.5 mt-2">
                         <select
                           value={i.status}
@@ -1084,97 +1160,103 @@ useEffect(() => {
                 })}
               </ul>
 
-         <div className="hidden lg:block">
-  <table className="w-full text-sm table-fixed">
-    <thead>
-      <tr className="bg-stone-50 border-b border-stone-200 text-left">
-        <th className="w-[26%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
-        <th className="w-[18%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Created By</th>
-        <th className="w-[18%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Assigned To</th>
-        <th className="w-[16%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Status</th>
-        <th className="w-[14%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Service</th>
-        <th className="w-[8%] px-3 py-2"></th>
-      </tr>
-    </thead>
-    <tbody className="divide-y divide-stone-100">
-      {bdFiltered.length === 0 ? (
-        <tr>
-          <td colSpan={6} className="px-3 py-6 text-center text-xs text-black/50">
-            No leads match these filters.
-          </td>
-        </tr>
-      ) : bdFiltered.map((i) => {
-        const creator = getCreatorName(i);
-        const role = getCreatorRole(i);
-        const badge = formatCreatorBadge(role);
-        const unread = user ? unreadCountFor(i, user.name) : 0;
-        const createdByMe = i.createdById === user?.userId || i.createdBy === user?.name;
-        const assignedToOther = !!i.assignedTo && i.assignedTo !== user?.name;
+              <div className="hidden lg:block">
+                <table className="w-full text-sm table-fixed">
+                  <thead>
+                    <tr className="bg-stone-50 border-b border-stone-200 text-left">
+                      <th className="w-[26%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
+                      <th className="w-[18%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Created By</th>
+                      <th className="w-[18%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Assigned To</th>
+                      <th className="w-[16%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Status</th>
+                      <th className="w-[14%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Service</th>
+                      <th className="w-[8%] px-3 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {bdFiltered.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-3 py-6 text-center text-xs text-black/50">
+                          No leads match these filters.
+                        </td>
+                      </tr>
+                    ) : bdFiltered.map((i) => {
+                      const creator = getCreatorName(i);
+                      const role = getCreatorRole(i);
+                      const badge = formatCreatorBadge(role);
+                      const unread = user ? unreadCountFor(i, user.name) : 0;
+                      const createdByMe = (i as any).createdById === user?.userId || (i as any).createdBy === user?.name;
+                      const assignedToOther = !!i.assignedTo && i.assignedTo !== user?.name;
 
-        return (
-          <tr key={i._id} className="hover:bg-stone-50/50">
-            <td className="px-3 py-2">
-              <div className="font-medium text-black text-[12px] truncate">{i.fullName}</div>
-              <div className="text-[10px] text-black/50 truncate">{i.email}</div>
-            </td>
-            <td className="px-3 py-2">
-              <div className="flex items-center gap-1 min-w-0">
-                <span className="text-[11px] text-stone-700 truncate">{creator}</span>
-                <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border shrink-0 ${badge.cls}`}>
-                  {badge.label}
-                </span>
+                      return (
+                        <tr key={i._id} className="hover:bg-stone-50/50">
+                          <td className="px-3 py-2">
+                            {/* ✅ Company-first title */}
+                            <div className="font-medium text-black text-[12px] truncate flex items-center gap-1">
+                              <span className="truncate">{getLeadTitle(i)}</span>
+                              {isInternationalLead(i) && (
+                                <span className="shrink-0 px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">Intl</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-black/50 truncate">{getLeadSubtitle(i)}</div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="text-[11px] text-stone-700 truncate">{creator}</span>
+                              <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border shrink-0 ${badge.cls}`}>
+                                {badge.label}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            {i.assignedTo ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className={`text-[11px] truncate ${i.assignedTo === user?.name ? "text-indigo-700 font-semibold" : "text-stone-800"}`}>
+                                  {i.assignedTo}
+                                  {i.assignedTo === user?.name ? " (you)" : ""}
+                                </span>
+                                {createdByMe && assignedToOther && (
+                                  <span className="text-[8px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 inline-block w-fit">
+                                    You created · now with {i.assignedTo}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-stone-400 italic">Unassigned</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              value={i.status}
+                              onChange={(e) => updateLead(i._id, { status: e.target.value })}
+                              className="w-full text-[10px] border border-stone-200 rounded-md p-1 bg-white"
+                            >
+                              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2 text-[11px] text-black/70 truncate">
+                            {i.serviceCategory || "General"}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center justify-end gap-1">
+                              <IconButton label="Chat" onClick={() => openChat(i)} badge={unread > 0}>
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                              </IconButton>
+                              <IconButton label="View" onClick={() => setSelected(i)}>
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              </IconButton>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            </td>
-            <td className="px-3 py-2">
-              {i.assignedTo ? (
-                <div className="flex flex-col gap-0.5">
-                  <span className={`text-[11px] truncate ${i.assignedTo === user?.name ? "text-indigo-700 font-semibold" : "text-stone-800"}`}>
-                    {i.assignedTo}
-                    {i.assignedTo === user?.name ? " (you)" : ""}
-                  </span>
-                  {createdByMe && assignedToOther && (
-                    <span className="text-[8px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 inline-block w-fit">
-                      You created · now with {i.assignedTo}
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <span className="text-[10px] text-stone-400 italic">Unassigned</span>
-              )}
-            </td>
-            <td className="px-3 py-2">
-              <select
-                value={i.status}
-                onChange={(e) => updateLead(i._id, { status: e.target.value })}
-                className="w-full text-[10px] border border-stone-200 rounded-md p-1 bg-white"
-              >
-                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </td>
-            <td className="px-3 py-2 text-[11px] text-black/70 truncate">
-              {i.serviceCategory || "General"}
-            </td>
-            <td className="px-3 py-2">
-              <div className="flex items-center justify-end gap-1">
-                <IconButton label="Chat" onClick={() => openChat(i)} badge={unread > 0}>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </IconButton>
-                <IconButton label="View" onClick={() => setSelected(i)}>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                </IconButton>
-              </div>
-            </td>
-          </tr>
-        );
-      })}
-    </tbody>
-  </table>
-</div>
             </div>
           </div>
         )}
@@ -1217,7 +1299,8 @@ useEffect(() => {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2 bg-white border border-stone-200 rounded-lg p-2">
+              {/* ✅ 5 cols to fit Region */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-1.5 sm:gap-2 bg-white border border-stone-200 rounded-lg p-2">
                 <div>
                   <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">From</label>
                   <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs" />
@@ -1238,6 +1321,15 @@ useEffect(() => {
                   <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs bg-white">
                     <option value="">Any</option>
                     {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                {/* ✅ Region filter */}
+                <div>
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Region</label>
+                  <select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value as any)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs bg-white">
+                    <option value="All">All</option>
+                    <option value="Local">Local (PK)</option>
+                    <option value="International">International</option>
                   </select>
                 </div>
               </div>
@@ -1276,8 +1368,14 @@ useEffect(() => {
                     <li key={i._id} className="px-2.5 py-2">
                       <div className="flex items-start justify-between gap-1.5">
                         <div className="min-w-0">
-                          <p className="font-semibold text-[11px] text-stone-800 truncate">{i.fullName}</p>
-                          <p className="text-[9px] text-stone-500 truncate">{i.email}</p>
+                          {/* ✅ Company-first title */}
+                          <p className="font-semibold text-[11px] text-stone-800 truncate flex items-center gap-1">
+                            <span className="truncate">{getLeadTitle(i)}</span>
+                            {isInternationalLead(i) && (
+                              <span className="shrink-0 px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">Intl</span>
+                            )}
+                          </p>
+                          <p className="text-[9px] text-stone-500 truncate">{getLeadSubtitle(i)}</p>
                         </div>
                         {unread > 0 && (
                           <span className="shrink-0 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-rose-600 text-white text-[8px] font-bold">
@@ -1349,8 +1447,14 @@ useEffect(() => {
                       return (
                         <tr key={i._id} className="hover:bg-stone-50/50">
                           <td className="px-2.5 py-2 min-w-0">
-                            <div className="font-medium text-black text-[12px] truncate">{i.fullName}</div>
-                            <div className="text-[10px] text-black/50 truncate">{i.email}</div>
+                            {/* ✅ Company-first title */}
+                            <div className="font-medium text-black text-[12px] truncate flex items-center gap-1">
+                              <span className="truncate">{getLeadTitle(i)}</span>
+                              {isInternationalLead(i) && (
+                                <span className="shrink-0 px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">Intl</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-black/50 truncate">{getLeadSubtitle(i)}</div>
                           </td>
                           <td className="px-2.5 py-2 min-w-0">
                             <div className="flex items-center gap-1 min-w-0">
@@ -1492,26 +1596,25 @@ useEffect(() => {
                           <td className="px-3 py-2 text-right">
                             <button
                               onClick={async () => {
-                         // in AdminClient, both places (mobile + desktop table)
-const newPass = prompt(`Enter new temporary password for ${u.name}:`);
-if (!newPass) return;
+                                const newPass = prompt(`Enter new temporary password for ${u.name}:`);
+                                if (!newPass) return;
 
-const res = await fetch("/api/admin/users", {
-  method: "PATCH",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    userId: u._id,
-    newPassword: newPass,
-    clearRequest: true,   // clears the passwordRequest flag
-  }),
-});
-const json = await res.json(); 
-if (json.success) {
-  alert("Password reset successfully and emailed to user.");
-  await loadUsers();
-} else {
-  alert("Failed: " + json.error);
-}
+                                const res = await fetch("/api/admin/users", {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    userId: u._id,
+                                    newPassword: newPass,
+                                    clearRequest: true,
+                                  }),
+                                });
+                                const json = await res.json();
+                                if (json.success) {
+                                  alert("Password reset successfully and emailed to user.");
+                                  await loadUsers();
+                                } else {
+                                  alert("Failed: " + json.error);
+                                }
                               }}
                               className="px-2 py-1 bg-indigo-600 text-white font-semibold text-[10px] rounded-md hover:bg-indigo-700 whitespace-nowrap"
                             >

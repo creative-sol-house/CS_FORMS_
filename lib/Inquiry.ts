@@ -14,6 +14,15 @@ export interface IInquiry extends InquiryData, Document {
   attachments?: LeadAttachment[];
 }
 
+// ✅ NEW SUB-SCHEMA
+const SocialLinkSchema = new Schema(
+  {
+    name: { type: String, trim: true },
+    url:  { type: String, trim: true },
+  },
+  { _id: false }
+);
+
 const SubmissionLocationSchema = new Schema<SubmissionLocation>(
   { ip: String, city: String, region: String, country: String, latitude: String, longitude: String, userAgent: String, referer: String },
   { _id: false }
@@ -39,6 +48,20 @@ const InquirySchema = new Schema<IInquiry>(
     clientType: { type: String, required: true, enum: ["Individual", "Business"] },
     consultantName: { type: String, required: true, trim: true },
     consultantId: { type: String, trim: true },
+        // ✅ NEW FIELDS
+    country: { type: String, trim: true },
+    isInternationalClient: { type: Boolean, default: false, index: true },
+clientRegion: {
+  type: String,
+  enum: ["Local", "International"],
+  default: "Local",
+  index: true,
+},
+    companyWebsite: { type: String, trim: true },
+    socialLinks: { type: [SocialLinkSchema], default: [] },   // ← array of {name, url}
+    location: { type: String, trim: true },
+    jobTitle: { type: String, trim: true },
+    clientRequirements: { type: String, trim: true },
     createdBy: { type: String, trim: true },
     createdById: { type: String, trim: true },
 

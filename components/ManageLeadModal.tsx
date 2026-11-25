@@ -22,6 +22,22 @@ function PrintPortal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body);
 }
 
+/* ✅ NEW — shared helper so the badge logic is identical everywhere */
+function isInternational(lead: InquiryDoc): boolean {
+  if (typeof (lead as any).isInternationalClient === "boolean") {
+    return (lead as any).isInternationalClient;
+  }
+  const country = (lead as any).country?.trim?.();
+  return !!country && country !== "Pakistan";
+}
+
+/* ✅ NEW — company-first display name */
+function getLeadDisplayTitle(lead: InquiryDoc): string {
+  const company = (lead as any).companyName?.trim?.();
+  if (lead.clientType === "Business" && company) return company;
+  return lead.fullName || "Unnamed Lead";
+}
+
 export default function ManageLeadModal({
   lead,
   onClose,
@@ -75,10 +91,16 @@ export default function ManageLeadModal({
     [lead.attachments]
   );
 
+  // ✅ Region helpers
+  const intl = isInternational(lead);
+  const regionLabel: "Local" | "International" =
+    ((lead as any).clientRegion as "Local" | "International" | undefined) ||
+    (intl ? "International" : "Local");
+  const displayTitle = getLeadDisplayTitle(lead);
+
   return (
     <>
       {/* ─────────── SCREEN-ONLY MODAL ─────────── */}
-      
       <div
         className="screen-only fixed inset-0 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6 z-50 transition-opacity"
         onClick={onClose}
@@ -92,12 +114,18 @@ export default function ManageLeadModal({
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-5">
                 <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-2xl font-bold text-white shadow-inner">
-                  {lead.fullName.charAt(0).toUpperCase()}
+                  {displayTitle.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <h1 className="text-2xl font-bold text-white tracking-tight">
-                      {lead.fullName}
+                  <div className="flex items-center gap-3 mb-1 flex-wrap">
+                    {/* ✅ Company-first title + Intl badge */}
+                    <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                      <span className="truncate">{displayTitle}</span>
+                      {intl && (
+                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-400/20 text-amber-200 border border-amber-300/40">
+                          Intl
+                        </span>
+                      )}
                     </h1>
                     <span
                       className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border shadow-sm ${STATUS_STYLES[lead.status]}`}
@@ -105,6 +133,14 @@ export default function ManageLeadModal({
                       {lead.status}
                     </span>
                   </div>
+
+                  {/* ✅ If business, show client name under the company title */}
+                  {lead.clientType === "Business" && displayTitle !== lead.fullName && (
+                    <div className="text-sm text-stone-300 font-medium mb-1">
+                      Contact: <span className="text-white">{lead.fullName}</span>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-4 text-sm text-stone-300 font-medium flex-wrap">
                     <span className="flex items-center gap-1.5">
                       <svg className="w-4 h-4 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
@@ -183,9 +219,18 @@ export default function ManageLeadModal({
                     <Cell label="Contact Via" value={lead.preferredContactMethod} />
                     <Cell label="Best Time" value={lead.preferredContactTime} />
                     <Cell
-  label="Lead Created"
-  value={lead.leadCreatedAt ? new Date(lead.leadCreatedAt).toLocaleString() : undefined}
-/>
+                      label="Lead Created"
+                      value={lead.leadCreatedAt ? new Date(lead.leadCreatedAt).toLocaleString() : undefined}
+                    />
+
+                    {/* ✅ NEW — Country / Location / Region */}
+                    <Cell label="Country" value={(lead as any).country} />
+                    <Cell label="Location" value={(lead as any).location} />
+                    <Cell
+                      label="Region"
+                      value={regionLabel}
+                      bold
+                    />
                   </div>
                 </div>
 
@@ -211,7 +256,44 @@ export default function ManageLeadModal({
                     )}
                   </div>
                 </div>
-
+                {/* ✅ NEW: Dedicated Social Links Section */}
+                {lead.socialLinks && lead.socialLinks.length > 0 && (
+                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
+                    <h3 className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      Social Links
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {lead.socialLinks.map((l, i) => {
+                        // Ensure the URL has https:// so it actually redirects
+                        const url = l.url 
+                          ? (l.url.startsWith("http") ? l.url : `https://${l.url}`) 
+                          : "#";
+                        
+                        return (
+                          <a
+                            key={i}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 hover:bg-white hover:border-indigo-300 hover:shadow-sm transition-all group"
+                            title={l.url}
+                          >
+                            <SocialIcon name={l.name} />
+                            <span className="text-xs font-semibold text-stone-700 group-hover:text-indigo-700">
+                              {l.name || "Link"}
+                            </span>
+                            <svg className="w-3 h-3 text-stone-400 group-hover:text-indigo-500 ml-1 opacity-50" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 {/* ─────────── ATTACHMENTS ─────────── */}
                 {attachments.length > 0 && (
                   <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5">
@@ -350,10 +432,7 @@ function AttachmentCard({ file }: { file: LeadAttachment }) {
   const isImage = file.fileType?.startsWith("image/");
   const isPdf =
     file.fileType === "application/pdf" ||
-    file.fileType === "application/pdf" ||
     file.url?.toLowerCase().endsWith(".pdf");
-  // Files that browsers CAN render inline
-  const canPreviewInline = isImage || isPdf;
 
   const viewUrl = file.publicId
     ? `/api/attachments/${encodeURIComponent(file.publicId)}`
@@ -381,9 +460,6 @@ function AttachmentCard({ file }: { file: LeadAttachment }) {
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-           
-       
-
           {/* Download — always available */}
           <a
             href={viewUrl}
@@ -438,7 +514,6 @@ function AttachmentPreviewModal({
           <p className="text-[11px] text-stone-400">{formatBytes(file.fileSize)}</p>
         </div>
         <div className="flex items-center gap-2">
-         
           <a
             href={viewUrl}
             download={file.fileName}
@@ -565,6 +640,12 @@ function PrintSheet({
   const imageAttachments = attachments.filter((f) => f.fileType?.startsWith("image/"));
   const otherAttachments = attachments.filter((f) => !f.fileType?.startsWith("image/"));
 
+  // ✅ Region for print
+  const printIntl = isInternational(lead);
+  const printRegionLabel =
+    (lead as any).clientRegion ||
+    (printIntl ? "International" : "Local");
+
   return (
     <>
       <style>{`
@@ -665,21 +746,25 @@ function PrintSheet({
                 <span className="pf-meta-val">{lead.serviceCategory || "—"}</span>
               </div>
               <div className="pf-meta-row">
+                <span className="pf-meta-key">Region:</span>
+                <span className="pf-meta-val">{printRegionLabel}</span>
+              </div>
+              <div className="pf-meta-row">
                 <span className="pf-meta-key">Assigned To:</span>
                 <span className="pf-meta-val">{lead.assignedTo || "Unassigned"}</span>
               </div>
               <div className="pf-meta-row">
-  <span className="pf-meta-key">Lead Created:</span>
-  <span className="pf-meta-val">
-    {lead.leadCreatedAt ? new Date(lead.leadCreatedAt).toLocaleString() : new Date(lead.createdAt).toLocaleString()}
-  </span>
-</div>
+                <span className="pf-meta-key">Lead Created:</span>
+                <span className="pf-meta-val">
+                  {lead.leadCreatedAt
+                    ? new Date(lead.leadCreatedAt).toLocaleString()
+                    : new Date(lead.createdAt).toLocaleString()}
+                </span>
+              </div>
               <div className="pf-meta-row">
                 <span className="pf-meta-key">Created Date:</span>
                 <span className="pf-meta-val">{new Date(lead.createdAt).toLocaleDateString()}</span>
               </div>
-
-              
             </div>
           </div>
 
@@ -797,6 +882,26 @@ function buildPrintSections(lead: InquiryDoc): {
   addClient("Consultant Name", lead.consultantName);
   addClient("Preferred Contact Method", lead.preferredContactMethod);
   addClient("Preferred Contact Time", lead.preferredContactTime);
+
+  // ✅ NEW — include country / location / region in the printed client section
+  addClient("Country", (lead as any).country);
+  addClient("Location", (lead as any).location);
+  addClient(
+    "Client Region",
+    (lead as any).clientRegion ||
+      ((lead as any).country && (lead as any).country !== "Pakistan"
+        ? "International"
+        : "Local")
+  );
+
+  // ✅ Format social links cleanly for the printout
+  if (lead.socialLinks && lead.socialLinks.length > 0) {
+    const socialsStr = lead.socialLinks
+      .map((l: any) => `${l.name || "Link"}: ${l.url || "—"}`)
+      .join("\n");
+    addClient("Social Links", socialsStr);
+  }
+
   if (clientRows.length) sections.push({ title: "1. Client & Contact Information", rows: clientRows });
 
   const submittedRows = getVisibleLeadFields(lead)
@@ -829,6 +934,8 @@ const HIDDEN_LEAD_FIELDS = new Set([
   "status", "assignedTo", "notes", "messages", "auditLogs", "attachments",
   "submissionLocation", "createdBy", "createdById", "consultantId",
   "leadCreatedAt", "source",
+  // ✅ Hide region flags and socials — they have dedicated cells
+  "country", "location", "isInternationalClient", "clientRegion", "socialLinks",
 ]);
 
 function getVisibleLeadFields(lead: InquiryDoc): [string, unknown][] {
@@ -856,7 +963,7 @@ function formatFieldLabel(key: string): string {
   return key
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")
-    .replace(/\\b\\w/g, (char) => char.toUpperCase());
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function formatFieldValue(value: unknown): string {
@@ -871,7 +978,7 @@ function formatFieldValue(value: unknown): string {
     return Object.entries(value as Record<string, unknown>)
       .filter(([, item]) => item !== undefined && item !== null && item !== "")
       .map(([key, item]) => `${formatFieldLabel(key)}: ${formatFieldValue(item)}`)
-      .join("\\n");
+      .join("\n");
   }
   return String(value).trim();
 }
@@ -892,4 +999,19 @@ function Cell({ label, value, bold, block }: { label: string; value?: string; bo
       </p>
     </div>
   );
+}
+
+/* ── Social Icons ── */
+function SocialIcon({ name }: { name?: string }) {
+  const n = (name || "").toLowerCase();
+  if (n.includes("facebook")) return <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg>;
+  if (n.includes("instagram")) return <svg className="w-4 h-4 text-pink-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37zm1.5-4.87h.01"></path></svg>;
+  if (n.includes("linkedin")) return <svg className="w-4 h-4 text-blue-700" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>;
+  if (n.includes("twitter") || n === "x") return <svg className="w-4 h-4 text-stone-800" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>;
+  if (n.includes("youtube")) return <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>;
+  if (n.includes("tiktok")) return <svg className="w-4 h-4 text-stone-900" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>;
+  if (n.includes("whatsapp")) return <svg className="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>;
+  if (n.includes("telegram")) return <svg className="w-4 h-4 text-sky-500" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>;
+  // Default icon (Globe)
+  return <svg className="w-4 h-4 text-stone-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>;
 }

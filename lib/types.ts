@@ -37,6 +37,16 @@ export interface InquiryData {
   clientType: ClientType;
   consultantName: string;
   consultantId?: string;
+country?: string;
+  // ✅ NEW — client region classification
+  isInternationalClient?: boolean;
+  clientRegion?: "Local" | "International";
+
+  companyWebsite?: string;
+  socialLinks?: SocialLink[];          // ← changed from string to array
+  location?: string;
+  jobTitle?: string;
+  clientRequirements?: string;
 createdBy?: string;
 createdById?: string;
   companyName?: string;
@@ -107,6 +117,11 @@ createdById?: string;
   followUps?: FollowUp[]; // <--- Add this here
 
 
+}
+
+export interface SocialLink {
+  name: string;   // e.g. "Facebook", "Instagram", "LinkedIn"
+  url: string;    // e.g. "https://facebook.com/company"
 }
 
 export interface InquiryDoc extends InquiryData {
