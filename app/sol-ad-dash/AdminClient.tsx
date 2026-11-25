@@ -1533,9 +1533,14 @@ export default function AdminClient() {
           <UserAnalysisPanel analysis={analysis} reload={loadAnalysis} onSelectLead={(lead) => setSelected(lead)} />
         )}
 
-        {currentTab === "lead-analysis" && isAdmin && (
-          <LeadAnalysisPanel />
-        )}
+     {currentTab === "lead-analysis" && isAdmin && (
+  <LeadAnalysisPanel
+    onUpdateLead={(lead) => {
+      setEditingLead(lead);
+      setSelected(null); // Close any open modals
+    }}
+  />
+)}
 
         {currentTab === "password-requests" && isAdmin && (
           <div className="space-y-3">

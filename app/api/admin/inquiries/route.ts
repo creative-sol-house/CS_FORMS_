@@ -320,7 +320,7 @@ export async function PATCH(req: Request) {
       });
     }
 
-    // ── ATTACHMENTS AUDIT + CLEANUP ─────────────────────────────────────
+     // ── ATTACHMENTS AUDIT + CLEANUP ─────────────────────────────────────
     if (updates.attachments !== undefined && Array.isArray(updates.attachments)) {
       const newIds = new Set<string>(
         updates.attachments
@@ -328,23 +328,31 @@ export async function PATCH(req: Request) {
           .filter((v: any): v is string => typeof v === "string" && !!v)
       );
 
-      const removedIds: string[] = Array.isArray(inquiry.attachments)
-        ? (inquiry.attachments as any[])
-            .map((a) => a?.publicId)
-            .filter(
-              (v: any): v is string =>
-                typeof v === "string" && !!v && !newIds.has(v)
-            )
-        : [];
+      const oldIds = new Set<string>(
+        Array.isArray(inquiry.attachments)
+          ? (inquiry.attachments as any[])
+              .map((a) => a?.publicId)
+              .filter((v: any): v is string => typeof v === "string" && !!v)
+          : []
+      );
 
-      auditEntries.push({
-        action: "Attachments",
-        details: `${updates.attachments.length} file(s) attached${
-          removedIds.length > 0 ? ` · ${removedIds.length} removed` : ""
-        }`,
-        performedBy: session.name,
-        timestamp: new Date(),
-      });
+      // Find what was added and what was removed
+      const addedIds = [...newIds].filter((id) => !oldIds.has(id));
+      const removedIds = [...oldIds].filter((id) => !newIds.has(id));
+
+      // ✅ FIX: ONLY log an audit entry if files were actually added or removed!
+      if (addedIds.length > 0 || removedIds.length > 0) {
+        const parts = [];
+        if (addedIds.length > 0) parts.push(`${addedIds.length} added`);
+        if (removedIds.length > 0) parts.push(`${removedIds.length} removed`);
+
+        auditEntries.push({
+          action: "Attachments",
+          details: `Files changed: ${parts.join(", ")}`,
+          performedBy: session.name,
+          timestamp: new Date(),
+        });
+      }
 
       if (removedIds.length > 0) {
         cloudinary.v2.config({
@@ -359,7 +367,7 @@ export async function PATCH(req: Request) {
         ).catch((e) => console.error("Cloudinary cleanup failed:", e));
       }
     }
-
+    
     if (auditEntries.length > 0) {
       updateQuery.$push = updateQuery.$push || {};
       updateQuery.$push.auditLogs = { $each: auditEntries };

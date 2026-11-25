@@ -39,9 +39,20 @@ function actionMeta(a: string) {
   return ACTION_META[a] || { color: "text-stone-700", icon: "•", ring: "ring-stone-200 bg-stone-50" };
 }
 
-export default function LeadAnalysisPanel() {
+function getLeadDisplayTitle(lead: any): string {
+  const company = lead.companyName?.trim?.();
+  if (lead.clientType === "Business" && company) return company;
+  return lead.fullName || "Unnamed Lead";
+}
+
+export default function LeadAnalysisPanel({
+  onUpdateLead,
+}: {
+  onUpdateLead?: (lead: any) => void;
+}) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchingLead, setFetchingLead] = useState(false);
 
   const [from, setFrom] = useState(daysAgoISO(30));
   const [to, setTo] = useState(todayISO());
@@ -72,6 +83,23 @@ export default function LeadAnalysisPanel() {
       return hay.includes(q);
     });
   }, [data, query]);
+
+  // ✅ FIX: Fully fetch the lead before editing so attachments aren't wiped
+  const handleEditLead = async (lead: any) => {
+    if (!onUpdateLead) return;
+    setFetchingLead(true);
+    try {
+      const res = await fetch(`/api/admin/inquiries?focus=${lead._id}`);
+      const json = await res.json();
+      if (json.success && json.inquiries?.length > 0) {
+        onUpdateLead(json.inquiries[0]);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setFetchingLead(false);
+    }
+  };
 
   if (loading) return <div className="p-10 text-center text-stone-500">Loading report...</div>;
   if (!data) return <div className="p-10 text-center text-rose-500">Failed to load report.</div>;
@@ -218,8 +246,17 @@ export default function LeadAnalysisPanel() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-stone-800 truncate">{lead.fullName}</p>
-                        <p className="text-[11px] text-stone-500 truncate">{lead.email}</p>
+                        <p className="font-semibold text-stone-800 truncate flex items-center gap-1.5">
+                          {getLeadDisplayTitle(lead)}
+                          {lead.clientType === "Business" && (
+                            <span className="shrink-0 px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider bg-violet-100 text-violet-700 border border-violet-200">
+                              Business
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-stone-500 truncate">
+                          {lead.companyName ? `Contact: ${lead.fullName}` : lead.email}
+                        </p>
                       </div>
                       <span className={`shrink-0 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full border ${STATUS_STYLES[lead.status] || "bg-stone-100 text-stone-700 border-stone-200"}`}>
                         {lead.status}
@@ -261,8 +298,17 @@ export default function LeadAnalysisPanel() {
                       onClick={() => setSelectedLead(lead)}
                     >
                       <td className="px-5 py-3">
-                        <p className="font-semibold text-stone-800">{lead.fullName}</p>
-                        <p className="text-[11px] text-stone-500">{lead.email}</p>
+                        <p className="font-semibold text-stone-800 flex items-center gap-1.5">
+                          {getLeadDisplayTitle(lead)}
+                          {lead.clientType === "Business" && (
+                            <span className="shrink-0 px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider bg-violet-100 text-violet-700 border border-violet-200">
+                              Business
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-stone-500">
+                          {lead.companyName ? `Contact: ${lead.fullName}` : lead.email}
+                        </p>
                       </td>
                       <td className="px-3 py-3 text-stone-700">{lead.serviceCategory || "—"}</td>
                       <td className="px-3 py-3">
@@ -298,6 +344,11 @@ export default function LeadAnalysisPanel() {
           initialFrom={from}
           initialTo={to}
           onClose={() => setSelectedLead(null)}
+          onEdit={onUpdateLead ? () => {
+            setSelectedLead(null);
+            handleEditLead(selectedLead);
+          } : undefined}
+          fetchingLead={fetchingLead}
         />
       )}
     </div>
@@ -305,22 +356,26 @@ export default function LeadAnalysisPanel() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   DRILLDOWN DRAWER — mobile-first, full-screen on phones
+   DRILLDOWN DRAWER
    ════════════════════════════════════════════════════════════════════ */
 function LeadDrilldownDrawer({
   lead,
   initialFrom,
   initialTo,
   onClose,
+  onEdit,
+  fetchingLead,
 }: {
   lead: any;
   initialFrom: string;
   initialTo: string;
   onClose: () => void;
+  onEdit?: () => void;
+  fetchingLead?: boolean;
 }) {
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
-  const [tab, setTab] = useState<"data" | "audit">("audit");
+  const [tab, setTab] = useState<"data" | "audit">("data");
   const [actionFilter, setActionFilter] = useState<string | "">("");
 
   // Lock body scroll on mobile while drawer is open
@@ -372,6 +427,9 @@ function LeadDrilldownDrawer({
     return groups;
   }, [logs]);
 
+  const intl = lead.isInternationalClient || (lead.country && lead.country !== "Pakistan");
+  const regionLabel = lead.clientRegion || (intl ? "International" : "Local");
+
   return (
     <div className="fixed inset-0 z-50 flex sm:justify-end">
       <div
@@ -397,36 +455,55 @@ function LeadDrilldownDrawer({
               <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
                 Lead drilldown
               </p>
-              <h2 className="text-lg sm:text-xl font-bold truncate mt-0.5">
-                {lead.fullName}
+              <h2 className="text-lg sm:text-xl font-bold truncate mt-0.5 flex items-center gap-2">
+                {getLeadDisplayTitle(lead)}
+                {lead.clientType === "Business" && (
+                  <span className="shrink-0 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-violet-400/20 text-violet-200 border border-violet-300/40">
+                    Business
+                  </span>
+                )}
+                {intl && (
+                  <span className="shrink-0 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-amber-400/20 text-amber-200 border border-amber-300/40">
+                    Intl
+                  </span>
+                )}
               </h2>
               <p className="text-xs text-stone-300 mt-0.5 truncate">
-                {lead.serviceCategory} · {lead.email}
+                {lead.companyName ? `Contact: ${lead.fullName}` : lead.email}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="shrink-0 p-2 -mr-1 rounded-full active:bg-white/15 hover:bg-white/15 transition-colors"
-              aria-label="Close"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            
+            <div className="flex items-center gap-1 shrink-0">
+              {onEdit && (
+                <button
+                  onClick={onEdit}
+                  disabled={fetchingLead}
+                  className="p-2 rounded-full hover:bg-white/15 transition-colors disabled:opacity-50"
+                  title="Edit Lead"
+                >
+                  {fetchingLead ? (
+                    <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin block" />
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  )}
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 -mr-1 rounded-full active:bg-white/15 hover:bg-white/15 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* TABS — big tap targets */}
           <div className="mt-3 grid grid-cols-2 gap-1 bg-white/10 rounded-xl p-1">
-            <button
-              onClick={() => setTab("audit")}
-              className={`py-2 text-xs font-semibold rounded-lg transition-colors ${
-                tab === "audit"
-                  ? "bg-white text-stone-900 shadow-sm"
-                  : "text-white/80 active:bg-white/10"
-              }`}
-            >
-              Audit ({lead.auditLogs?.length || 0})
-            </button>
             <button
               onClick={() => setTab("data")}
               className={`py-2 text-xs font-semibold rounded-lg transition-colors ${
@@ -436,6 +513,16 @@ function LeadDrilldownDrawer({
               }`}
             >
               Details
+            </button>
+            <button
+              onClick={() => setTab("audit")}
+              className={`py-2 text-xs font-semibold rounded-lg transition-colors ${
+                tab === "audit"
+                  ? "bg-white text-stone-900 shadow-sm"
+                  : "text-white/80 active:bg-white/10"
+              }`}
+            >
+              Audit ({lead.auditLogs?.length || 0})
             </button>
           </div>
         </div>
@@ -566,6 +653,9 @@ function LeadDrilldownDrawer({
 
 /* ── Read-only lead data view ── */
 function LeadDataView({ lead }: { lead: any }) {
+  const intl = lead.isInternationalClient || (lead.country && lead.country !== "Pakistan");
+  const regionLabel = lead.clientRegion || (intl ? "International" : "Local");
+
   return (
     <div className="space-y-3">
       <DataSection title="Client">
@@ -575,7 +665,27 @@ function LeadDataView({ lead }: { lead: any }) {
         <Row label="Client Type" value={lead.clientType} />
         <Row label="Company" value={lead.companyName} />
         <Row label="Designation" value={lead.designation} />
+        <Row label="Country" value={lead.country} />
+        <Row label="Region" value={regionLabel} />
       </DataSection>
+
+      {lead.socialLinks && lead.socialLinks.length > 0 && (
+        <DataSection title="Social Links">
+          <div className="flex flex-wrap gap-2">
+            {lead.socialLinks.map((l: any, i: number) => (
+              <a
+                key={i}
+                href={l.url?.startsWith("http") ? l.url : `https://${l.url}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-stone-200 bg-white hover:bg-stone-50 transition-colors"
+              >
+                <span className="text-[11px] font-semibold text-stone-700">{l.name || "Link"}</span>
+              </a>
+            ))}
+          </div>
+        </DataSection>
+      )}
 
       <DataSection title="Ownership">
         <Row label="Consultant" value={lead.consultantName} />

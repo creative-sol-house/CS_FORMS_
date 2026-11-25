@@ -37,6 +37,7 @@ export async function GET(req: Request) {
       ? {}
       : { $or: [{ assignedTo: session.name }, { createdById: session.userId }] };
 
+  // ✅ Fetch all fields including attachments
   const allLeads = await Inquiry.find(leadQuery).sort({ createdAt: -1 }).lean();
 
   const inRange = (d?: Date | string | null) => {
@@ -47,7 +48,6 @@ export async function GET(req: Request) {
     return true;
   };
 
-  // Counts of each action across ALL in-range logs (for KPI chips etc.)
   const actionCounts: Record<string, number> = {};
 
   const scopedLeads = allLeads
@@ -101,7 +101,8 @@ export async function GET(req: Request) {
           note: log.details,
           date: log.timestamp,
           loggedBy: log.performedBy,
-          leadName: lead.fullName,
+          // ✅ Use companyName if it exists
+          leadName: lead.companyName || lead.fullName,
           leadId: lead._id,
         });
       }

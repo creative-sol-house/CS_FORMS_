@@ -110,9 +110,10 @@ export default function LeadForm({
     consultantName,
     agreeToTerms: true,
     subscribeUpdates: false,
+    country: "Pakistan", // ✅ SET DEFAULT TO PAKISTAN
     leadCreatedAt: initialData?.leadCreatedAt || new Date().toISOString(),
     socialLinks: initialData?.socialLinks || [],
-    ...initialData,
+    ...initialData, // (If editing, initialData will override this default)
   }));
 
   const [attachments, setAttachments] = useState<LeadAttachment[]>(
