@@ -130,10 +130,15 @@ export default function ChatModal({
         <div className="bg-[#075E54] px-4 py-3 flex justify-between items-center text-white shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-lg shrink-0">
-              {lead.fullName.charAt(0).toUpperCase()}
-            </div>
+{(
+  lead.fullName?.trim() ||
+  lead.companyName?.trim() ||
+  "?"
+).charAt(0).toUpperCase()}            </div>
             <div className="min-w-0">
-              <h2 className="text-base font-semibold truncate">{lead.fullName}</h2>
+              <h2 className="text-base font-semibold truncate">
+  {lead.fullName?.trim() || lead.companyName?.trim() || "Unnamed Client"}
+</h2>
               <p className="text-[11px] text-white/75 truncate">{lead.email}</p>
             </div>
           </div>
