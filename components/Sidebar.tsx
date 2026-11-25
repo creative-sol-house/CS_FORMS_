@@ -34,15 +34,18 @@ export default function Sidebar({ user, view, setView, passwordRequestCount, log
 
   return (
     <>
+      {/* Mobile menu button — fixed top-right, sits BELOW the header (top-16) so it never overlaps the title/user button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-40 p-2 bg-white border border-stone-200 rounded-md shadow-sm text-black"
+        aria-label="Open menu"
+        className="lg:hidden fixed top-6 right-3 z-30 p-2 bg-white border border-stone-200 rounded-lg shadow-md text-black active:scale-95 transition-transform"
       >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
 
+      {/* Backdrop */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm z-40 lg:hidden transition-opacity"
@@ -50,9 +53,10 @@ export default function Sidebar({ user, view, setView, passwordRequestCount, log
         />
       )}
 
+      {/* Drawer */}
       <aside className={`
-        fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-stone-200 flex flex-col h-full 
-        transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-stone-200 flex flex-col h-full 
+        transition-transform duration-300 ease-in-out shadow-2xl
         ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}>
         
