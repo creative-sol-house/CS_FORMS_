@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link"; // Added for the analytics link
 import { InquiryDoc, SessionUser, UserDoc, ServiceCategory } from "@/lib/types";
 import Sidebar from "@/components/Sidebar";
 import UsersPanel from "@/components/UsersPanel";
@@ -70,10 +71,10 @@ export default function AdminClient() {
   const [creatorFilter, setCreatorFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [onlyUnread, setOnlyUnread] = useState(false);
-  // ✅ Region filter
+  
   const [regionFilter, setRegionFilter] = useState<"All" | "Local" | "International">("All");
   const [bdRegionFilter, setBdRegionFilter] = useState<"All" | "Local" | "International">("All");
-const [bdSearch, setBdSearch] = useState("");
+  const [bdSearch, setBdSearch] = useState("");
   const [bdDateFrom, setBdDateFrom] = useState("");
   const [bdDateTo, setBdDateTo] = useState("");
   const [bdServiceFilter, setBdServiceFilter] = useState<ServiceFilter>("All");
@@ -162,7 +163,6 @@ const [bdSearch, setBdSearch] = useState("");
         if (data.type === "lead:update") {
           const lead = data.lead;
 
-          // ── 1. Explicit drop signal (server says: you can no longer see this)
           if (lead.__drop) {
             setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
             if (chatLead?._id === lead._id) setChatLead(null);
@@ -170,7 +170,6 @@ const [bdSearch, setBdSearch] = useState("");
             return;
           }
 
-          // ── 2. Deletion signal (existing behaviour)
           if (lead.__deleted) {
             setInquiries((prev) => prev.filter((i) => i._id !== lead._id));
             if (chatLead?._id === lead._id) setChatLead(null);
@@ -178,7 +177,6 @@ const [bdSearch, setBdSearch] = useState("");
             return;
           }
 
-          // ── 3. Defensive client-side visibility check.
           const mine = user.role === "admin"
             ? true
             : (lead.createdById && lead.createdById === user.userId) ||
@@ -192,7 +190,6 @@ const [bdSearch, setBdSearch] = useState("");
             return;
           }
 
-          // ── 4. Normal upsert
           setInquiries((prev) => {
             const exists = prev.some((i) => i._id === lead._id);
             return exists
@@ -384,14 +381,12 @@ const [bdSearch, setBdSearch] = useState("");
     setAddLeadOpen(false);
   };
 
-  // ✅ Lead title = company name for business leads, fallback to client name
   const getLeadTitle = (i: InquiryDoc): string => {
     const company = (i as any).companyName?.trim?.();
     if (i.clientType === "Business" && company) return company;
     return i.fullName || "Unnamed Lead";
   };
 
-  // ✅ Secondary line under title — client name (if business) else email
   const getLeadSubtitle = (i: InquiryDoc): string => {
     const company = (i as any).companyName?.trim?.();
     if (i.clientType === "Business" && company && i.fullName) {
@@ -400,7 +395,6 @@ const [bdSearch, setBdSearch] = useState("");
     return i.email || "";
   };
 
-  // ✅ International check (with fallback if field missing)
   const isInternationalLead = (i: InquiryDoc): boolean => {
     const flagged = (i as any).isInternationalClient;
     if (typeof flagged === "boolean") return flagged;
@@ -451,7 +445,6 @@ const [bdSearch, setBdSearch] = useState("");
     return inquiries.filter((i) => {
       if (filter !== "All" && i.serviceCategory !== filter) return false;
       if (statusFilter && i.status !== statusFilter) return false;
-      // ✅ Region filter
       if (regionFilter !== "All") {
         const intl = isInternationalLead(i);
         if (regionFilter === "International" && !intl) return false;
@@ -467,7 +460,6 @@ const [bdSearch, setBdSearch] = useState("");
           i.email?.toLowerCase().includes(q) ||
           i.phone?.toLowerCase().includes(q) ||
           i.consultantName?.toLowerCase().includes(q) ||
-          // ✅ include company name in search
           ((i as any).companyName?.toLowerCase?.().includes(q) ?? false)
         );
       }
@@ -484,7 +476,6 @@ const [bdSearch, setBdSearch] = useState("");
     (dateTo ? 1 : 0) +
     (search ? 1 : 0) +
     (onlyUnread ? 1 : 0) +
-    // ✅
     (regionFilter !== "All" ? 1 : 0);
 
   const clearFilters = () => {
@@ -495,7 +486,6 @@ const [bdSearch, setBdSearch] = useState("");
     setDateTo("");
     setSearch("");
     setOnlyUnread(false);
-    // ✅
     setRegionFilter("All");
   };
 
@@ -508,48 +498,46 @@ const [bdSearch, setBdSearch] = useState("");
     return Array.from(set).sort();
   }, [inquiries]);
 
-const bdFiltered = useMemo(() => {
-  return inquiries.filter((i) => {
-    if (bdServiceFilter !== "All" && i.serviceCategory !== bdServiceFilter) return false;
-    if (bdStatusFilter && i.status !== bdStatusFilter) return false;
-    if (bdOnlyUnread && user && unreadCountFor(i, user.name) === 0) return false;
+  const bdFiltered = useMemo(() => {
+    return inquiries.filter((i) => {
+      if (bdServiceFilter !== "All" && i.serviceCategory !== bdServiceFilter) return false;
+      if (bdStatusFilter && i.status !== bdStatusFilter) return false;
+      if (bdOnlyUnread && user && unreadCountFor(i, user.name) === 0) return false;
 
-    if (bdRegionFilter !== "All") {
-      const intl = isInternationalLead(i);
-      if (bdRegionFilter === "International" && !intl) return false;
-      if (bdRegionFilter === "Local" && intl) return false;
-    }
+      if (bdRegionFilter !== "All") {
+        const intl = isInternationalLead(i);
+        if (bdRegionFilter === "International" && !intl) return false;
+        if (bdRegionFilter === "Local" && intl) return false;
+      }
 
-    if (bdOnlyMine) {
-      const createdById = (i as any).createdById;
-      const createdBy = (i as any).createdBy;
-      const consultantName = i.consultantName;
-      const isMine =
-        (createdById && createdById === user?.userId) ||
-        (createdBy && createdBy === user?.name) ||
-        (consultantName && consultantName === user?.name);
-      if (!isMine) return false;
-    }
+      if (bdOnlyMine) {
+        const createdById = (i as any).createdById;
+        const createdBy = (i as any).createdBy;
+        const consultantName = i.consultantName;
+        const isMine =
+          (createdById && createdById === user?.userId) ||
+          (createdBy && createdBy === user?.name) ||
+          (consultantName && consultantName === user?.name);
+        if (!isMine) return false;
+      }
 
-    if (!isInDateRange(i.createdAt, bdDateFrom, bdDateTo)) return false;
+      if (!isInDateRange(i.createdAt, bdDateFrom, bdDateTo)) return false;
 
-    // ✅ Search
-    if (bdSearch) {
-      const q = bdSearch.toLowerCase();
-      const matches =
-        i.fullName?.toLowerCase().includes(q) ||
-        i.email?.toLowerCase().includes(q) ||
-        i.phone?.toLowerCase().includes(q) ||
-        i.consultantName?.toLowerCase().includes(q) ||
-        ((i as any).companyName?.toLowerCase?.().includes(q) ?? false);
-      if (!matches) return false;
-    }
+      if (bdSearch) {
+        const q = bdSearch.toLowerCase();
+        const matches =
+          i.fullName?.toLowerCase().includes(q) ||
+          i.email?.toLowerCase().includes(q) ||
+          i.phone?.toLowerCase().includes(q) ||
+          i.consultantName?.toLowerCase().includes(q) ||
+          ((i as any).companyName?.toLowerCase?.().includes(q) ?? false);
+        if (!matches) return false;
+      }
 
-    return true;
-  });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [inquiries, bdServiceFilter, bdStatusFilter, bdOnlyMine, bdDateFrom, bdDateTo, bdOnlyUnread, user, bdRegionFilter, bdSearch]);
-
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inquiries, bdServiceFilter, bdStatusFilter, bdOnlyMine, bdDateFrom, bdDateTo, bdOnlyUnread, user, bdRegionFilter, bdSearch]);
 
   const bdSummary = useMemo(() => {
     const rangeFiltered = inquiries.filter((i) =>
@@ -575,26 +563,26 @@ const bdFiltered = useMemo(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiries, bdDateFrom, bdDateTo, user]);
 
-const bdActiveFilters =
-  (bdServiceFilter !== "All" ? 1 : 0) +
-  (bdStatusFilter ? 1 : 0) +
-  (bdOnlyMine ? 1 : 0) +
-  (bdOnlyUnread ? 1 : 0) +
-  (bdDateFrom ? 1 : 0) +
-  (bdDateTo ? 1 : 0) +
-  (bdRegionFilter !== "All" ? 1 : 0) +
-  (bdSearch ? 1 : 0);   // ✅
+  const bdActiveFilters =
+    (bdServiceFilter !== "All" ? 1 : 0) +
+    (bdStatusFilter ? 1 : 0) +
+    (bdOnlyMine ? 1 : 0) +
+    (bdOnlyUnread ? 1 : 0) +
+    (bdDateFrom ? 1 : 0) +
+    (bdDateTo ? 1 : 0) +
+    (bdRegionFilter !== "All" ? 1 : 0) +
+    (bdSearch ? 1 : 0);
 
-const clearBdFilters = () => {
-  setBdServiceFilter("All");
-  setBdStatusFilter("");
-  setBdOnlyMine(false);
-  setBdOnlyUnread(false);
-  setBdDateFrom("");
-  setBdDateTo("");
-  setBdRegionFilter("All");
-  setBdSearch("");       // ✅
-};
+  const clearBdFilters = () => {
+    setBdServiceFilter("All");
+    setBdStatusFilter("");
+    setBdOnlyMine(false);
+    setBdOnlyUnread(false);
+    setBdDateFrom("");
+    setBdDateTo("");
+    setBdRegionFilter("All");
+    setBdSearch("");
+  };
 
   const totalUnreadLeads = useMemo(
     () => (user ? inquiries.filter((i) => unreadCountFor(i, user.name) > 0).length : 0),
@@ -744,25 +732,40 @@ const clearBdFilters = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            {["dashboard", "leads"].includes(currentTab) && (
-              <button
-                onClick={() => openAddLead(undefined)}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[11px] sm:text-sm font-semibold shadow-sm rounded-lg sm:rounded-xl transition-colors"
-              >
-                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                Add
-              </button>
-            )}
+          {/* ─── HEADER ACTIONS (Mobile Responsive) ─── */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+            <div className="flex items-center gap-2">
+              {["dashboard", "leads"].includes(currentTab) && (
+                <button
+                  onClick={() => openAddLead(undefined)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[11px] sm:text-sm font-semibold shadow-sm rounded-lg sm:rounded-xl transition-colors shrink-0"
+                >
+                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add
+                </button>
+              )}
 
-            <div className="relative" ref={settingsRef}>
+              {/* ✨ Cute Animated My Analytics Button */}
+              <Link
+                href="/sol-ad-dash/my-analytics"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white text-[11px] sm:text-sm font-semibold shadow-sm rounded-lg sm:rounded-xl transition-all duration-300 shrink-0"
+              >
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                My Analytics
+              </Link>
+            </div>
+
+            {/* Profile Box */}
+            <div className="relative shrink-0" ref={settingsRef}>
               <button
                 onClick={() => setSettingsOpen(!settingsOpen)}
                 className="flex items-center gap-1.5 sm:gap-3 px-1.5 sm:px-3 py-1.5 bg-white border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors shadow-sm"
               >
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-stone-900 text-white flex items-center justify-center font-bold text-xs sm:text-sm overflow-hidden">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-stone-900 text-white flex items-center justify-center font-bold text-xs sm:text-sm overflow-hidden shrink-0">
                   {user.profilePicture ? (
                     <img src={user.profilePicture} alt="Me" className="w-full h-full object-cover" />
                   ) : (
@@ -933,7 +936,6 @@ const clearBdFilters = () => {
                     <li key={i._id} className="px-3 py-2.5">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          {/* ✅ Company-first title */}
                           <p className="font-semibold text-xs text-stone-800 truncate flex items-center gap-1">
                             <span className="truncate">{getLeadTitle(i)}</span>
                             {isInternationalLead(i) && (
@@ -980,7 +982,6 @@ const clearBdFilters = () => {
                       return (
                         <tr key={i._id} className="hover:bg-stone-50 transition-colors">
                           <td className="px-3 py-2">
-                            {/* ✅ Company-first title */}
                             <div className="font-semibold text-stone-800 text-[12px] truncate flex items-center gap-1">
                               <span className="truncate">{getLeadTitle(i)}</span>
                               {isInternationalLead(i) && (
@@ -1025,16 +1026,14 @@ const clearBdFilters = () => {
                   <button onClick={clearBdFilters} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wider">
                     Clear ({bdActiveFilters})
                   </button>
-                  
                 )}
               </div>
                <input
-    className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-xs sm:text-sm text-black focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
-    placeholder="Search name, company, email, phone…"
-    value={bdSearch}
-    onChange={(e) => setBdSearch(e.target.value)}
-  />
-              {/* ✅ 5 cols to fit Region */}
+                className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-xs sm:text-sm text-black focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                placeholder="Search name, company, email, phone…"
+                value={bdSearch}
+                onChange={(e) => setBdSearch(e.target.value)}
+              />
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-1.5 sm:gap-2">
                 <div>
                   <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">From</label>
@@ -1057,7 +1056,6 @@ const clearBdFilters = () => {
                     {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-                {/* ✅ Region filter */}
                 <div>
                   <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Region</label>
                   <select value={bdRegionFilter} onChange={(e) => setBdRegionFilter(e.target.value as any)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px] bg-white">
@@ -1126,7 +1124,6 @@ const clearBdFilters = () => {
                     <li key={i._id} className="px-3 py-2.5">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          {/* ✅ Company-first title */}
                           <p className="font-semibold text-xs text-stone-800 truncate flex items-center gap-1">
                             <span className="truncate">{getLeadTitle(i)}</span>
                             {isInternationalLead(i) && (
@@ -1210,7 +1207,6 @@ const clearBdFilters = () => {
                       return (
                         <tr key={i._id} className="hover:bg-stone-50/50">
                           <td className="px-3 py-2">
-                            {/* ✅ Company-first title */}
                             <div className="font-medium text-black text-[12px] truncate flex items-center gap-1">
                               <span className="truncate">{getLeadTitle(i)}</span>
                               {isInternationalLead(i) && (
@@ -1319,7 +1315,6 @@ const clearBdFilters = () => {
                 )}
               </div>
 
-              {/* ✅ 5 cols to fit Region */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-1.5 sm:gap-2 bg-white border border-stone-200 rounded-lg p-2">
                 <div>
                   <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">From</label>
@@ -1343,7 +1338,6 @@ const clearBdFilters = () => {
                     {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-                {/* ✅ Region filter */}
                 <div>
                   <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Region</label>
                   <select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value as any)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs bg-white">
@@ -1375,7 +1369,6 @@ const clearBdFilters = () => {
             </div>
 
             <div className="bg-white border border-stone-200 rounded-lg shadow-sm overflow-hidden">
-              {/* Mobile cards */}
               <ul className="lg:hidden divide-y divide-stone-100">
                 {filtered.length === 0 ? (
                   <li className="px-3 py-6 text-center text-xs text-black/50">No leads match these filters.</li>
@@ -1388,7 +1381,6 @@ const clearBdFilters = () => {
                     <li key={i._id} className="px-2.5 py-2">
                       <div className="flex items-start justify-between gap-1.5">
                         <div className="min-w-0">
-                          {/* ✅ Company-first title */}
                           <p className="font-semibold text-[11px] text-stone-800 truncate flex items-center gap-1">
                             <span className="truncate">{getLeadTitle(i)}</span>
                             {isInternationalLead(i) && (
@@ -1442,7 +1434,6 @@ const clearBdFilters = () => {
                 })}
               </ul>
 
-              {/* Desktop table — table-fixed, no overflow */}
               <div className="hidden lg:block">
                 <table className="w-full text-sm table-fixed">
                   <thead>
@@ -1467,7 +1458,6 @@ const clearBdFilters = () => {
                       return (
                         <tr key={i._id} className="hover:bg-stone-50/50">
                           <td className="px-2.5 py-2 min-w-0">
-                            {/* ✅ Company-first title */}
                             <div className="font-medium text-black text-[12px] truncate flex items-center gap-1">
                               <span className="truncate">{getLeadTitle(i)}</span>
                               {isInternationalLead(i) && (
@@ -1553,14 +1543,14 @@ const clearBdFilters = () => {
           <UserAnalysisPanel analysis={analysis} reload={loadAnalysis} onSelectLead={(lead) => setSelected(lead)} />
         )}
 
-     {currentTab === "lead-analysis" && isAdmin && (
-  <LeadAnalysisPanel
-    onUpdateLead={(lead) => {
-      setEditingLead(lead);
-      setSelected(null); // Close any open modals
-    }}
-  />
-)}
+        {currentTab === "lead-analysis" && isAdmin && (
+          <LeadAnalysisPanel
+            onUpdateLead={(lead) => {
+              setEditingLead(lead);
+              setSelected(null);
+            }}
+          />
+        )}
 
         {currentTab === "password-requests" && isAdmin && (
           <div className="space-y-3">
