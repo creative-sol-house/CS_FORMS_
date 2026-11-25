@@ -284,7 +284,7 @@ export default function MyAnalyticsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#fafaf9] p-4 sm:p-6 lg:p-8 flex items-center justify-center">
-        <div className="w-full max-w-6xl bg-white border border-stone-200 shadow-sm p-10 text-center">
+        <div className="text-center">
           <p className="text-sm font-medium text-black">Loading your analytics…</p>
         </div>
       </div>
@@ -294,7 +294,7 @@ export default function MyAnalyticsPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-[#fafaf9] p-4 sm:p-6 lg:p-8 flex items-center justify-center">
-        <div className="w-full max-w-6xl bg-white border border-rose-200 shadow-sm p-10 text-center">
+        <div className="text-center">
           <p className="text-sm font-bold text-rose-700">{error}</p>
           <button
             onClick={load}
@@ -312,32 +312,40 @@ export default function MyAnalyticsPage() {
   // ── Render ────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#fafaf9] p-4 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto bg-white border border-stone-200 shadow-sm rounded-xl overflow-hidden">
+      <div className="max-w-7xl mx-auto">
         
         {/* TOP TOOLBAR */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-stone-200">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div className="flex items-center gap-3">
-          
-            <h2 className="text-xs font-bold text-black uppercase tracking-wider">
+            <button 
+              onClick={() => router.push("/sol-ad-dash")}
+              className="text-stone-400 hover:text-stone-700 transition-colors"
+              title="Back to Dashboard"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+            <h2 className="text-sm sm:text-base font-bold text-black uppercase tracking-wider">
               My Analytics
             </h2>
-            <span className="px-2.5 py-1.5 border border-stone-200 bg-stone-50 text-xs font-semibold text-black">
+            <span className="px-2.5 py-1.5 border border-stone-200 bg-white text-xs font-semibold text-black shadow-sm">
               {me.name}
-              <span className="text-black/40 font-normal"> · {me.role.replace("_", " ")}</span>
+              <span className="text-black/40 font-normal hidden sm:inline"> · {me.role.replace("_", " ")}</span>
             </span>
           </div>
           <button
             onClick={load}
-            className="px-3 py-1.5 bg-stone-100 text-black text-[11px] font-bold uppercase tracking-wider hover:bg-stone-200 transition-colors"
+            className="self-start sm:self-auto px-3 py-1.5 bg-white border border-stone-200 text-black text-[11px] font-bold uppercase tracking-wider hover:bg-stone-50 transition-colors shadow-sm"
           >
             Refresh
           </button>
         </div>
 
         {/* FILTER BAR */}
-        <div className="px-4 py-3 border-b border-stone-200 bg-stone-50/40 space-y-2">
+        <div className="bg-white border border-stone-200 shadow-sm p-3 sm:p-4 mb-6 space-y-3">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-bold text-black/50 uppercase tracking-wider mr-1">
+            <span className="text-[10px] font-bold text-black/50 uppercase tracking-wider mr-1 w-full sm:w-auto mb-1 sm:mb-0">
               Range
             </span>
             {([
@@ -363,90 +371,94 @@ export default function MyAnalyticsPage() {
             {activeFilterCount > 0 && (
               <button
                 onClick={clearFilters}
-                className="ml-2 px-2 py-1 text-[10.5px] font-semibold text-rose-600 border border-rose-200 bg-rose-50 hover:bg-rose-100"
+                className="ml-0 sm:ml-2 px-2 py-1 text-[10.5px] font-semibold text-rose-600 border border-rose-200 bg-rose-50 hover:bg-rose-100"
               >
                 Clear ({activeFilterCount})
               </button>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
-              className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
-            >
-              <option value="All">All sources</option>
-              <option value="Created">Created by me</option>
-              <option value="Assigned">Assigned to me</option>
-              <option value="Both">Created & assigned to me</option>
-            </select>
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full sm:w-auto sm:flex-1">
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
+                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
+              >
+                <option value="All">All sources</option>
+                <option value="Created">Created by me</option>
+                <option value="Assigned">Assigned to me</option>
+                <option value="Both">Created & assigned to me</option>
+              </select>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
-            >
-              <option value="All">All statuses</option>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
+              >
+                <option value="All">All statuses</option>
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
 
-            <select
-              value={serviceFilter}
-              onChange={(e) => setServiceFilter(e.target.value)}
-              className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
-            >
-              <option value="All">All services</option>
-              {SERVICES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+              <select
+                value={serviceFilter}
+                onChange={(e) => setServiceFilter(e.target.value)}
+                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
+              >
+                <option value="All">All services</option>
+                {SERVICES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
 
-            <span className="text-[10px] text-black/30 mx-1">|</span>
+            <span className="hidden sm:block text-[10px] text-black/30 mx-1">|</span>
 
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => {
-                setMonth(e.target.value);
-                if (e.target.value) {
-                  setDateFrom("");
-                  setDateTo("");
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full sm:w-auto">
+              <input
+                type="month"
+                value={month}
+                onChange={(e) => {
+                  setMonth(e.target.value);
+                  if (e.target.value) {
+                    setDateFrom("");
+                    setDateTo("");
+                    setPreset("custom");
+                  }
+                }}
+                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
+                title="Filter by month"
+              />
+
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  setMonth("");
                   setPreset("custom");
-                }
-              }}
-              className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
-              title="Filter by month"
-            />
+                }}
+                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
+                title="From date"
+              />
+              
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setMonth("");
+                  setPreset("custom");
+                }}
+                className="px-2 py-1.5 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500 w-full"
+                title="To date"
+              />
+            </div>
 
             <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => {
-                setDateFrom(e.target.value);
-                setMonth("");
-                setPreset("custom");
-              }}
-              className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
-              title="From date"
-            />
-            <span className="text-[10px] text-black/40">→</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => {
-                setDateTo(e.target.value);
-                setMonth("");
-                setPreset("custom");
-              }}
-              className="px-2 py-1 border border-stone-300 text-[11px] bg-white text-black outline-none focus:border-indigo-500"
-              title="To date"
-            />
-
-            <input
-              className="px-2.5 py-1 border border-stone-300 text-[11px] text-black outline-none focus:border-indigo-500 w-40 ml-auto"
+              className="px-2.5 py-1.5 border border-stone-300 text-[11px] text-black outline-none focus:border-indigo-500 w-full sm:w-48 sm:ml-auto"
               placeholder="Search name / email…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -455,7 +467,7 @@ export default function MyAnalyticsPage() {
         </div>
 
         {/* SUMMARY */}
-        <div className="grid grid-cols-2 md:grid-cols-5 border-b border-stone-200 divide-x divide-stone-200 bg-stone-50/50">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-6">
           <SplitCard label="Created by me" value={summary.created} hint="In current filter" color="text-indigo-700" />
           <SplitCard label="Assigned to me" value={summary.assigned} hint="In current filter" color="text-emerald-700" />
           <SplitCard label="Created & assigned" value={summary.both} hint="Overlap" color="text-amber-700" />
@@ -464,8 +476,8 @@ export default function MyAnalyticsPage() {
         </div>
 
         {/* CHARTS */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 border-b border-stone-200 divide-y lg:divide-y-0 lg:divide-x divide-stone-200">
-          <div className="lg:col-span-1 p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white border border-stone-200 shadow-sm p-4">
             <ChartTitle>Lead Activity</ChartTitle>
             <div className="h-48">
               {chart.timeline.length ? (
@@ -482,7 +494,7 @@ export default function MyAnalyticsPage() {
             </div>
           </div>
 
-          <div className="p-4">
+          <div className="bg-white border border-stone-200 shadow-sm p-4">
             <ChartTitle>Status Breakdown</ChartTitle>
             <div className="h-48">
               {chart.status.length ? (
@@ -501,7 +513,7 @@ export default function MyAnalyticsPage() {
             </div>
           </div>
 
-          <div className="p-4">
+          <div className="bg-white border border-stone-200 shadow-sm p-4">
             <ChartTitle>Service Mix</ChartTitle>
             <div className="h-48">
               {chart.services.length ? (
@@ -518,84 +530,130 @@ export default function MyAnalyticsPage() {
           </div>
         </div>
 
-        {/* TABLE */}
-        <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-2.5 border-b border-stone-200 bg-stone-50">
-          <h3 className="text-[11px] font-bold text-black uppercase tracking-wider">
-            My Leads <span className="text-black/50 font-normal normal-case">({filteredLeads.length})</span>
-          </h3>
-        </div>
+        {/* TABLE / CARDS */}
+        <div className="bg-white border border-stone-200 shadow-sm">
+          <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-3 border-b border-stone-200 bg-stone-50">
+            <h3 className="text-[11px] font-bold text-black uppercase tracking-wider">
+              My Leads <span className="text-black/50 font-normal normal-case">({filteredLeads.length})</span>
+            </h3>
+          </div>
 
-        <div className="overflow-x-auto max-h-96 overflow-y-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-stone-50 z-10">
-              <tr className="border-b border-stone-200 text-left">
-                <Th>Client</Th>
-                <Th>Source</Th>
-                <Th>Assigned To</Th>
-                <Th>Status</Th>
-                <Th>Service</Th>
-                <Th>Date</Th>
-                <Th />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {filteredLeads.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-xs text-black/50">
-                    No leads match these filters
-                  </td>
+          {/* Mobile Card View */}
+          <ul className="md:hidden divide-y divide-stone-100">
+            {filteredLeads.length === 0 ? (
+              <li className="px-4 py-8 text-center text-xs text-black/50">
+                No leads match these filters
+              </li>
+            ) : filteredLeads.map((l) => {
+              const source = classifyLead(l);
+              const sourceBadge =
+                source === "Both"
+                  ? { label: "Both", cls: "bg-amber-50 text-amber-700 border-amber-200" }
+                  : source === "Created"
+                  ? { label: "Created", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" }
+                  : { label: "Assigned", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+              const assignedElsewhere = source === "Created" && l.assignedTo && l.assignedTo !== me.name;
+
+              return (
+                <li key={l._id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-black text-sm truncate">{l.fullName}</p>
+                      <p className="text-xs text-black/60 truncate">{l.email}</p>
+                    </div>
+                    <Pill status={l.status} />
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className={`px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider border ${sourceBadge.cls}`}>
+                      {sourceBadge.label}
+                    </span>
+                    <span className="text-black/60 truncate">{l.serviceCategory || "General"}</span>
+                    <span className="text-black/40 ml-auto">{new Date(l.createdAt).toLocaleDateString()}</span>
+                  </div>
+
+                  <div className="text-[11px] flex items-center gap-1.5">
+                    <span className="text-black/50">Assigned to:</span>
+                    {l.assignedTo ? (
+                      <div className="flex flex-col">
+                        <span className={`font-medium ${l.assignedTo === me.name ? "text-emerald-700" : "text-black/80"}`}>
+                          {l.assignedTo}
+                        </span>
+                        {assignedElsewhere && <span className="text-[9px] text-amber-700">(handed off)</span>}
+                      </div>
+                    ) : (
+                      <span className="text-stone-400 italic">Unassigned</span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-stone-50 z-10">
+                <tr className="border-b border-stone-200 text-left">
+                  <Th>Client</Th>
+                  <Th>Source</Th>
+                  <Th>Assigned To</Th>
+                  <Th>Status</Th>
+                  <Th>Service</Th>
+                  <Th>Date</Th>
                 </tr>
-              ) : filteredLeads.map((l) => {
-                const source = classifyLead(l);
-                const sourceBadge =
-                  source === "Both"
-                    ? { label: "Both", cls: "bg-amber-50 text-amber-700 border-amber-200" }
-                    : source === "Created"
-                    ? { label: "Created", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" }
-                    : { label: "Assigned", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
-                const assignedElsewhere = source === "Created" && l.assignedTo && l.assignedTo !== me.name;
-
-                return (
-                  <tr key={l._id} className="hover:bg-stone-50/50">
-                    <td className="px-4 py-2.5">
-                      <div className="font-medium text-black text-[13px] leading-tight">{l.fullName}</div>
-                      <div className="text-[10.5px] text-black/60">{l.email}</div>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className={`px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider border ${sourceBadge.cls}`}>
-                        {sourceBadge.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {l.assignedTo ? (
-                        <div className="flex flex-col">
-                          <span className={`text-[11px] ${l.assignedTo === me.name ? "text-emerald-700 font-semibold" : "text-black/80"}`}>
-                            {l.assignedTo}
-                          </span>
-                          {assignedElsewhere && <span className="text-[9px] text-amber-700">(handed off)</span>}
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-stone-400 italic">Unassigned</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5"><Pill status={l.status} /></td>
-                    <td className="px-4 py-2.5 text-[11px] text-black">{l.serviceCategory}</td>
-                    <td className="px-4 py-2.5 text-[11px] text-black/60">
-                      {new Date(l.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button 
-                        onClick={() => router.push(`/sol-ad-dash?tab=leads`)}
-                        className="text-indigo-600 font-semibold hover:underline text-[11px]"
-                      >
-                        View
-                      </button>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {filteredLeads.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-xs text-black/50">
+                      No leads match these filters
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ) : filteredLeads.map((l) => {
+                  const source = classifyLead(l);
+                  const sourceBadge =
+                    source === "Both"
+                      ? { label: "Both", cls: "bg-amber-50 text-amber-700 border-amber-200" }
+                      : source === "Created"
+                      ? { label: "Created", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" }
+                      : { label: "Assigned", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+                  const assignedElsewhere = source === "Created" && l.assignedTo && l.assignedTo !== me.name;
+
+                  return (
+                    <tr key={l._id} className="hover:bg-stone-50/50">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-black text-[13px] leading-tight">{l.fullName}</div>
+                        <div className="text-[10.5px] text-black/60">{l.email}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider border ${sourceBadge.cls}`}>
+                          {sourceBadge.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {l.assignedTo ? (
+                          <div className="flex flex-col">
+                            <span className={`text-[11px] ${l.assignedTo === me.name ? "text-emerald-700 font-semibold" : "text-black/80"}`}>
+                              {l.assignedTo}
+                            </span>
+                            {assignedElsewhere && <span className="text-[9px] text-amber-700">(handed off)</span>}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-stone-400 italic">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3"><Pill status={l.status} /></td>
+                      <td className="px-4 py-3 text-[11px] text-black">{l.serviceCategory}</td>
+                      <td className="px-4 py-3 text-[11px] text-black/60">
+                        {new Date(l.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -605,20 +663,20 @@ export default function MyAnalyticsPage() {
 // ── Helpers ────────────────────────────────────────────────
 function SplitCard({ label, value, hint, color }: { label: string; value: number | string; hint: string; color: string }) {
   return (
-    <div className="px-4 py-3">
-      <p className="text-[10px] font-bold text-black/50 uppercase tracking-wider">{label}</p>
-      <p className={`text-xl font-bold mt-0.5 ${color}`}>{value}</p>
-      <p className="text-[9.5px] text-black/50 mt-0.5">{hint}</p>
+    <div className="bg-white border border-stone-200 shadow-sm p-3 sm:p-4 rounded-xl flex flex-col justify-center">
+      <p className="text-[10px] font-bold text-black/50 uppercase tracking-wider truncate">{label}</p>
+      <p className={`text-xl sm:text-2xl font-bold mt-1 ${color}`}>{value}</p>
+      <p className="text-[9.5px] text-black/50 mt-0.5 truncate">{hint}</p>
     </div>
   );
 }
 
 function ChartTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-[10.5px] font-bold text-black/70 uppercase tracking-wider mb-2">{children}</h3>;
+  return <h3 className="text-[10.5px] font-bold text-black/70 uppercase tracking-wider mb-3">{children}</h3>;
 }
 
 function Th({ children }: { children?: React.ReactNode }) {
-  return <th className="px-4 py-2 text-[10px] font-bold text-black uppercase tracking-wider">{children}</th>;
+  return <th className="px-4 py-2.5 text-[10px] font-bold text-black uppercase tracking-wider">{children}</th>;
 }
 
 function Pill({ status }: { status: string }) {
