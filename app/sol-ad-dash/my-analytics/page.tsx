@@ -348,7 +348,7 @@ export default function MyAnalyticsPage() {
   {" · "}
   {me.role
     .replace(/_/g, " ")          // all underscores → spaces
-    .replace(/\b\w/g, (c) => c.toUpperCase())}  // capitalize each word
+    .replace(/\b\w/g, (c) => c.toUpperCase())} 
 </span>            </p>
           </div>
 
