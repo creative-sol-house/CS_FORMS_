@@ -341,11 +341,15 @@ export default function MyAnalyticsPage() {
               </svg>
               Dashboard
             </button>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">My analytics</h1>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">My Analytics</h1>
             <p className="text-[13px] text-stone-500 mt-0.5">
               {me.name}
-              <span className="text-stone-400"> · {me.role.replace("_", " ")}</span>
-            </p>
+<span className="text-stone-400">
+  {" · "}
+  {me.role
+    .replace(/_/g, " ")          // all underscores → spaces
+    .replace(/\b\w/g, (c) => c.toUpperCase())}  // capitalize each word
+</span>            </p>
           </div>
 
           <button onClick={load} disabled={loading} className={`${BTN_SECONDARY} self-start sm:self-auto`}>
