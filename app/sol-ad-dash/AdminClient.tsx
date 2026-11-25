@@ -73,7 +73,7 @@ export default function AdminClient() {
   // ✅ Region filter
   const [regionFilter, setRegionFilter] = useState<"All" | "Local" | "International">("All");
   const [bdRegionFilter, setBdRegionFilter] = useState<"All" | "Local" | "International">("All");
-
+const [bdSearch, setBdSearch] = useState("");
   const [bdDateFrom, setBdDateFrom] = useState("");
   const [bdDateTo, setBdDateTo] = useState("");
   const [bdServiceFilter, setBdServiceFilter] = useState<ServiceFilter>("All");
@@ -508,35 +508,48 @@ export default function AdminClient() {
     return Array.from(set).sort();
   }, [inquiries]);
 
-  const bdFiltered = useMemo(() => {
-    return inquiries.filter((i) => {
-      if (bdServiceFilter !== "All" && i.serviceCategory !== bdServiceFilter) return false;
-      if (bdStatusFilter && i.status !== bdStatusFilter) return false;
-      if (bdOnlyUnread && user && unreadCountFor(i, user.name) === 0) return false;
+const bdFiltered = useMemo(() => {
+  return inquiries.filter((i) => {
+    if (bdServiceFilter !== "All" && i.serviceCategory !== bdServiceFilter) return false;
+    if (bdStatusFilter && i.status !== bdStatusFilter) return false;
+    if (bdOnlyUnread && user && unreadCountFor(i, user.name) === 0) return false;
 
-      // ✅ Region filter
-      if (bdRegionFilter !== "All") {
-        const intl = isInternationalLead(i);
-        if (bdRegionFilter === "International" && !intl) return false;
-        if (bdRegionFilter === "Local" && intl) return false;
-      }
+    if (bdRegionFilter !== "All") {
+      const intl = isInternationalLead(i);
+      if (bdRegionFilter === "International" && !intl) return false;
+      if (bdRegionFilter === "Local" && intl) return false;
+    }
 
-      if (bdOnlyMine) {
-        const createdById = (i as any).createdById;
-        const createdBy = (i as any).createdBy;
-        const consultantName = i.consultantName;
-        const isMine =
-          (createdById && createdById === user?.userId) ||
-          (createdBy && createdBy === user?.name) ||
-          (consultantName && consultantName === user?.name);
-        if (!isMine) return false;
-      }
-      if (!isInDateRange(i.createdAt, bdDateFrom, bdDateTo)) return false;
-      return true;
-    });
-    // ✅ Fixed deps: was using admin deps before
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inquiries, bdServiceFilter, bdStatusFilter, bdOnlyMine, bdDateFrom, bdDateTo, bdOnlyUnread, user, bdRegionFilter]);
+    if (bdOnlyMine) {
+      const createdById = (i as any).createdById;
+      const createdBy = (i as any).createdBy;
+      const consultantName = i.consultantName;
+      const isMine =
+        (createdById && createdById === user?.userId) ||
+        (createdBy && createdBy === user?.name) ||
+        (consultantName && consultantName === user?.name);
+      if (!isMine) return false;
+    }
+
+    if (!isInDateRange(i.createdAt, bdDateFrom, bdDateTo)) return false;
+
+    // ✅ Search
+    if (bdSearch) {
+      const q = bdSearch.toLowerCase();
+      const matches =
+        i.fullName?.toLowerCase().includes(q) ||
+        i.email?.toLowerCase().includes(q) ||
+        i.phone?.toLowerCase().includes(q) ||
+        i.consultantName?.toLowerCase().includes(q) ||
+        ((i as any).companyName?.toLowerCase?.().includes(q) ?? false);
+      if (!matches) return false;
+    }
+
+    return true;
+  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [inquiries, bdServiceFilter, bdStatusFilter, bdOnlyMine, bdDateFrom, bdDateTo, bdOnlyUnread, user, bdRegionFilter, bdSearch]);
+
 
   const bdSummary = useMemo(() => {
     const rangeFiltered = inquiries.filter((i) =>
@@ -562,26 +575,26 @@ export default function AdminClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiries, bdDateFrom, bdDateTo, user]);
 
-  const bdActiveFilters =
-    (bdServiceFilter !== "All" ? 1 : 0) +
-    (bdStatusFilter ? 1 : 0) +
-    (bdOnlyMine ? 1 : 0) +
-    (bdOnlyUnread ? 1 : 0) +
-    (bdDateFrom ? 1 : 0) +
-    (bdDateTo ? 1 : 0) +
-    // ✅
-    (bdRegionFilter !== "All" ? 1 : 0);
+const bdActiveFilters =
+  (bdServiceFilter !== "All" ? 1 : 0) +
+  (bdStatusFilter ? 1 : 0) +
+  (bdOnlyMine ? 1 : 0) +
+  (bdOnlyUnread ? 1 : 0) +
+  (bdDateFrom ? 1 : 0) +
+  (bdDateTo ? 1 : 0) +
+  (bdRegionFilter !== "All" ? 1 : 0) +
+  (bdSearch ? 1 : 0);   // ✅
 
-  const clearBdFilters = () => {
-    setBdServiceFilter("All");
-    setBdStatusFilter("");
-    setBdOnlyMine(false);
-    setBdOnlyUnread(false);
-    setBdDateFrom("");
-    setBdDateTo("");
-    // ✅
-    setBdRegionFilter("All");
-  };
+const clearBdFilters = () => {
+  setBdServiceFilter("All");
+  setBdStatusFilter("");
+  setBdOnlyMine(false);
+  setBdOnlyUnread(false);
+  setBdDateFrom("");
+  setBdDateTo("");
+  setBdRegionFilter("All");
+  setBdSearch("");       // ✅
+};
 
   const totalUnreadLeads = useMemo(
     () => (user ? inquiries.filter((i) => unreadCountFor(i, user.name) > 0).length : 0),
@@ -1012,8 +1025,15 @@ export default function AdminClient() {
                   <button onClick={clearBdFilters} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wider">
                     Clear ({bdActiveFilters})
                   </button>
+                  
                 )}
               </div>
+               <input
+    className="w-full px-2.5 py-1.5 border border-stone-300 rounded-lg text-xs sm:text-sm text-black focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+    placeholder="Search name, company, email, phone…"
+    value={bdSearch}
+    onChange={(e) => setBdSearch(e.target.value)}
+  />
               {/* ✅ 5 cols to fit Region */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-1.5 sm:gap-2">
                 <div>

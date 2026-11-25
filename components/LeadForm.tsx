@@ -127,8 +127,9 @@ export default function LeadForm({
     const e: Record<string, string> = {};
     if (step >= 1) {
       if (!data.companyName?.trim()) e.companyName = "Required";
-      if (!data.email?.trim()) e.email = "Required";
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = "Invalid email";
+if (data.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+  e.email = "Invalid email";
+}
       if (!data.phone?.trim()) e.phone = "Required";
       else if (!/^[+\d][\d\s\-()]{5,}$/.test(data.phone)) e.phone = "Invalid phone";
       if (!data.country?.trim()) e.country = "Required";
@@ -380,7 +381,7 @@ function StepClient({
             options={[{ value: "Individual", label: "Individual" }, { value: "Business", label: "Business" }]}
           />
         </Field>
-        <Field label="Email" required error={errors.email}>
+        <Field label="Email"  error={errors.email}>
           <TextInput type="email" value={data.email || ""} onChange={(v) => set("email", v)} placeholder="jane@company.com" />
         </Field>
         <Field label="Phone" required error={errors.phone}>

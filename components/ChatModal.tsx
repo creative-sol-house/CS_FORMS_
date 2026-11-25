@@ -139,7 +139,6 @@ export default function ChatModal({
               <h2 className="text-base font-semibold truncate">
   {lead.fullName?.trim() || lead.companyName?.trim() || "Unnamed Client"}
 </h2>
-              <p className="text-[11px] text-white/75 truncate">{lead.email}</p>
             </div>
           </div>
           <button

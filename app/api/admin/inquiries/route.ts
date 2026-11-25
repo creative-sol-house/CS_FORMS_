@@ -94,7 +94,18 @@ export async function POST(req: Request) {
 
     await connectDB();
     const body = await req.json();
+// Email is optional; validate only when provided
+body.email = body.email?.trim() || "";
 
+if (
+  body.email &&
+  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)
+) {
+  return NextResponse.json(
+    { success: false, error: "Invalid email address" },
+    { status: 400 }
+  );
+}
     // ── Normalize the user-supplied "Lead Created" timestamp ────────────────
     let leadCreatedAt: Date;
     if (body.leadCreatedAt) {

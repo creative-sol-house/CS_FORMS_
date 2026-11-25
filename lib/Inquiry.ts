@@ -43,7 +43,7 @@ const InquirySchema = new Schema<IInquiry>(
   {
     serviceCategory: { type: String, enum: ["Automation Software", "Web Development", "Logo Design", "Digital Marketing"] },
     fullName: { type: String,  trim: true },
-    email: { type: String, required: true, trim: true, lowercase: true },
+    email: { type: String, trim: true, lowercase: true },
     phone: { type: String, required: true, trim: true },
     clientType: { type: String, required: true, enum: ["Individual", "Business"] },
     consultantName: { type: String, required: true, trim: true },

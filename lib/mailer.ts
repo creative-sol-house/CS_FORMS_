@@ -200,8 +200,13 @@ export function passwordChangedEmail(name: string, newPassword: string) {
 
 export function leadAssignedEmail(
   name: string,
-  lead: { fullName?: string; email: string; phone: string; serviceCategory?: string; status?: string }
-) {
+lead: {
+  fullName?: string;
+  email?: string;
+  phone: string;
+  serviceCategory?: string;
+  status?: string;
+}) {
   const content = `
     <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 22px; font-weight: 600;">New Lead Assigned</h2>
     <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
@@ -220,10 +225,14 @@ export function leadAssignedEmail(
         </td>
       </tr>
       <tr>
-        <td style="padding: 16px; border-bottom: 1px solid #e2e8f0;">
-          <span style="display: block; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Email</span>
-          <a href="mailto:${lead.email}" style="color: #4f46e5; font-size: 15px; font-weight: 500; text-decoration: none;">${lead.email}</a>
-        </td>
+      <td style="padding: 16px; border-bottom: 1px solid #e2e8f0;">
+  <span style="display: block; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Email</span>
+  ${
+    lead.email?.trim()
+      ? `<a href="mailto:${lead.email}" style="color: #4f46e5; font-size: 15px; font-weight: 500; text-decoration: none;">${lead.email}</a>`
+      : `<span style="color: #64748b; font-size: 15px;">Not provided</span>`
+  }
+</td>
         <td style="padding: 16px; border-bottom: 1px solid #e2e8f0;">
           <span style="display: block; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px;">Phone</span>
           <a href="tel:${lead.phone}" style="color: #4f46e5; font-size: 15px; font-weight: 500; text-decoration: none;">${lead.phone}</a>
@@ -256,7 +265,7 @@ export function leadCreatedByDeveloperEmail(
   creatorName: string,
   lead: {
     fullName?: string;
-    email: string;
+    email?: string;
     phone: string;
     serviceCategory?: string;
   }
@@ -273,10 +282,16 @@ export function leadCreatedByDeveloperEmail(
         <span style="display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:600;">Client</span>
         <span style="color:#0f172a;font-size:15px;font-weight:500;">${clientName}</span>
       </td></tr>
-      <tr><td style="padding:16px;border-bottom:1px solid #e2e8f0;">
-        <span style="display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:600;">Email</span>
-        <a href="mailto:${lead.email}" style="color:#4f46e5;">${lead.email}</a>
-      </td></tr>
+  <tr>
+  <td style="padding:16px;border-bottom:1px solid #e2e8f0;">
+    <span style="display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:600;">Email</span>
+    ${
+      lead.email?.trim()
+        ? `<a href="mailto:${lead.email}" style="color:#4f46e5;">${lead.email}</a>`
+        : `<span style="color:#64748b;">Not provided</span>`
+    }
+  </td>
+</tr>
       <tr><td style="padding:16px;border-bottom:1px solid #e2e8f0;">
         <span style="display:block;color:#64748b;font-size:12px;text-transform:uppercase;font-weight:600;">Phone</span>
         <a href="tel:${lead.phone}" style="color:#4f46e5;">${lead.phone}</a>
