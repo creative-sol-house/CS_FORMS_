@@ -735,8 +735,9 @@ export default function AdminClient() {
           </div>
 
        {/* ─── HEADER ACTIONS (Mobile Responsive) ─── */}
-<div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-  <div className="flex items-center gap-2">
+
+<div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
     {["dashboard", "leads"].includes(currentTab) && (
       <button
         onClick={() => openAddLead(undefined)}
@@ -824,7 +825,7 @@ export default function AdminClient() {
     </button>
 
     {settingsOpen && (
-      <div className="absolute right-0 mt-2 w-56 bg-white border border-stone-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+      <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1.5rem)] bg-white border border-stone-200 rounded-2xl shadow-xl z-50 overflow-hidden">
         <div className="p-4 border-b border-stone-100 bg-stone-50">
           <p className="text-sm font-semibold text-black truncate">{user.name}</p>
           <p className="text-xs text-black/60 truncate">{user.email}</p>
@@ -1084,7 +1085,7 @@ export default function AdminClient() {
                 value={bdSearch}
                 onChange={(e) => setBdSearch(e.target.value)}
               />
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-1.5 sm:gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2">
                 <div>
                   <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">From</label>
                   <input type="date" value={bdDateFrom} onChange={(e) => setBdDateFrom(e.target.value)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px]" />
@@ -1138,7 +1139,7 @@ export default function AdminClient() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
               <div className="bg-linear-to-br from-indigo-500 to-indigo-700 p-3 rounded-xl shadow-sm text-white">
                 <p className="text-[9px] sm:text-[10px] font-bold text-indigo-100 uppercase tracking-wider mb-0.5">Total</p>
                 <p className="text-xl sm:text-3xl font-extrabold">{bdSummary.total}</p>
@@ -1365,7 +1366,7 @@ export default function AdminClient() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-1.5 sm:gap-2 bg-white border border-stone-200 rounded-lg p-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 bg-white border border-stone-200 rounded-lg p-2">
                 <div>
                   <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">From</label>
                   <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs" />
