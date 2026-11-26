@@ -1,6 +1,31 @@
 "use client";
 import { useEffect, useState } from "react";
 
+// Change this to your app's name if you want it in the label, e.g. "Install CRM"
+const BUTTON_LABEL = "Install App";
+
+const pillClass =
+  "shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs sm:text-sm font-semibold rounded-full shadow-sm active:scale-95 transition whitespace-nowrap";
+
+function DownloadIcon() {
+  return (
+    <svg
+      className="w-4 h-4 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"
+      />
+    </svg>
+  );
+}
+
 export default function InstallButton() {
   const [canInstall, setCanInstall] = useState(false);
   const [isIos, setIsIos] = useState(false);
@@ -35,14 +60,9 @@ export default function InstallButton() {
   // Android / desktop Chrome & Edge
   if (canInstall) {
     return (
-      <button
-        onClick={handleInstall}
-        className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-      >
-        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4" />
-</svg>
- App
+      <button onClick={handleInstall} className={pillClass}>
+        <DownloadIcon />
+        {BUTTON_LABEL}
       </button>
     );
   }
@@ -50,20 +70,30 @@ export default function InstallButton() {
   // iPhone / iPad: manual steps
   if (isIos) {
     return (
-      <div>
-        <button
-          onClick={() => setShowIosHelp((v) => !v)}
-          className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-        >
-          Install App
+      <>
+        <button onClick={() => setShowIosHelp((v) => !v)} className={pillClass}>
+          <DownloadIcon />
+          {BUTTON_LABEL}
         </button>
+
         {showIosHelp && (
-          <p className="mt-2 max-w-xs text-sm text-neutral-600">
-            In Safari, tap the <strong>Share</strong> button, then{" "}
-            <strong>Add to Home Screen</strong>.
-          </p>
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-2rem)] max-w-xs rounded-2xl bg-white border border-stone-200 shadow-xl p-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm text-stone-700">
+                In Safari, tap the <strong>Share</strong> button, then{" "}
+                <strong>Add to Home Screen</strong>.
+              </p>
+              <button
+                onClick={() => setShowIosHelp(false)}
+                aria-label="Close"
+                className="text-stone-400 hover:text-stone-700 text-lg leading-none"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
         )}
-      </div>
+      </>
     );
   }
 
