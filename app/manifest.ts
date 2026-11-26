@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Your App Name",
-    short_name: "YourApp",
+    name: "LEADS-Management@CSH",
+    short_name: "LEADS",
     start_url: "/sol-ad-dash",
     scope: "/",
     display: "standalone",
