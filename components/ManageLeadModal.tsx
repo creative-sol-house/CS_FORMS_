@@ -110,7 +110,7 @@ export default function ManageLeadModal({
           onClick={(e) => e.stopPropagation()}
         >
           {/* HEADER */}
-          <div className="relative bg-gradient-to-r from-stone-900 via-stone-800 to-stone-900 px-6 py-5 shrink-0">
+          <div className="relative bg-linear-to-r from-stone-900 via-stone-800 to-stone-900 px-6 py-5 shrink-0">
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-5">
                 <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-2xl font-bold text-white shadow-inner">

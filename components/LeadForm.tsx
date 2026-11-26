@@ -199,7 +199,7 @@ const body = {
 
       <div className="relative w-full sm:max-w-3xl bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[94vh] ring-1 ring-stone-900/5">
         {/* Header */}
-        <div className="relative bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-600 px-4 sm:px-6 pt-5 sm:pt-6 pb-4 sm:pb-5 text-white shrink-0">
+        <div className="relative bg-linear-to-br from-indigo-600 via-indigo-600 to-violet-600 px-4 sm:px-6 pt-5 sm:pt-6 pb-4 sm:pb-5 text-white shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-indigo-200">
@@ -935,7 +935,7 @@ function TextArea({ value, onChange, placeholder, rows = 3 }: {
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className={`${inputBase} border-stone-300 hover:border-stone-400 resize-y min-h-[80px]`}
+      className={`${inputBase} border-stone-300 hover:border-stone-400 resize-y min-h-20`}
     />
   );
 }

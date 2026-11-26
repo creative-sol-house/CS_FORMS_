@@ -751,7 +751,7 @@ export default function AdminClient() {
           )}
         </div>
         <div className="hidden md:block text-left min-w-0">
-          <p className="text-sm font-semibold text-black leading-tight truncate max-w-[120px]">{user.name}</p>
+          <p className="text-sm font-semibold text-black leading-tight truncate max-w-30">{user.name}</p>
           <p className="text-[10px] text-black/60 uppercase tracking-wider">{user.role.replace("_", " ")}</p>
         </div>
         <svg
@@ -822,7 +822,7 @@ export default function AdminClient() {
       className="group relative flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 overflow-hidden bg-white border-2 border-indigo-200 hover:border-indigo-500 text-indigo-600 hover:text-white text-[11px] sm:text-sm font-bold shadow-sm hover:shadow-md rounded-full transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 shrink-0"
     >
       {/* Fill-up layer */}
-      <span className="absolute inset-0 bg-gradient-to-t from-indigo-600 to-indigo-500 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+      <span className="absolute inset-0 bg-linear-to-t from-indigo-600 to-indigo-500 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
 
       <svg
         className="relative z-10 w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-300 group-hover:rotate-[-8deg] group-hover:scale-110"
@@ -1008,7 +1008,7 @@ export default function AdminClient() {
               </ul>
 
               <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-sm table-fixed min-w-[720px]">
+                <table className="w-full text-sm table-fixed min-w-180">
                   <thead>
                     <tr className="border-b border-stone-200 bg-white">
                       <th className="w-[32%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Client</th>
@@ -1177,7 +1177,7 @@ export default function AdminClient() {
                           <p className="text-[11px] text-stone-500 truncate">{getLeadSubtitle(i)}</p>
                         </div>
                         {unread > 0 && (
-                          <span className="shrink-0 min-w-[18px] h-4.5 px-1 flex items-center justify-center rounded-full bg-rose-600 text-white text-[9px] font-bold">
+                          <span className="shrink-0 min-w-4.5 h-4.5 px-1 flex items-center justify-center rounded-full bg-rose-600 text-white text-[9px] font-bold">
                             {unread}
                           </span>
                         )}
@@ -1222,7 +1222,7 @@ export default function AdminClient() {
               </ul>
 
               <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-sm table-fixed min-w-[720px]">
+                <table className="w-full text-sm table-fixed min-w-180">
                   <thead>
                     <tr className="bg-stone-50 border-b border-stone-200 text-left">
                       <th className="w-[26%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
@@ -1327,7 +1327,7 @@ export default function AdminClient() {
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <input
-                  className="flex-1 min-w-[120px] px-2.5 py-1.5 border border-stone-300 rounded-lg text-xs sm:text-sm text-black focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                  className="flex-1 min-w-30 px-2.5 py-1.5 border border-stone-300 rounded-lg text-xs sm:text-sm text-black focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                   placeholder="Search…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -1347,7 +1347,7 @@ export default function AdminClient() {
                   </svg>
                   Unread
                   {totalUnreadLeads > 0 && (
-                    <span className={`text-[9px] font-bold min-w-[16px] text-center px-1 py-0.5 rounded-full ${onlyUnread ? "bg-white/25 text-white" : "bg-rose-600 text-white"}`}>
+                    <span className={`text-[9px] font-bold min-w-4 text-center px-1 py-0.5 rounded-full ${onlyUnread ? "bg-white/25 text-white" : "bg-rose-600 text-white"}`}>
                       {totalUnreadLeads}
                     </span>
                   )}
@@ -1434,7 +1434,7 @@ export default function AdminClient() {
                           <p className="text-[11px] text-stone-500 truncate">{getLeadSubtitle(i)}</p>
                         </div>
                         {unread > 0 && (
-                          <span className="shrink-0 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-rose-600 text-white text-[8px] font-bold">
+                          <span className="shrink-0 min-w-4 h-4 px-1 flex items-center justify-center rounded-full bg-rose-600 text-white text-[8px] font-bold">
                             {unread}
                           </span>
                         )}
@@ -1479,7 +1479,7 @@ export default function AdminClient() {
               </ul>
 
               <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-sm table-fixed min-w-[720px]">
+                <table className="w-full text-sm table-fixed min-w-180">
                   <thead>
                     <tr className="bg-stone-50 border-b border-stone-200 text-left">
                       <th className="w-[26%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
@@ -1637,7 +1637,7 @@ export default function AdminClient() {
                 </ul>
 
                 <div className="hidden lg:block overflow-x-auto">
-                  <table className="w-full text-sm table-fixed min-w-[640px]">
+                  <table className="w-full text-sm table-fixed min-w-160">
                     <thead>
                       <tr className="bg-stone-50 border-b border-stone-200">
                         <th className="w-[25%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider text-left">Name</th>
