@@ -38,7 +38,7 @@ export default function Sidebar({ user, view, setView, passwordRequestCount, log
       <button
         onClick={() => setIsOpen(true)}
         aria-label="Open menu"
-        className="lg:hidden fixed top-6 right-3 z-30 p-2 bg-white border border-stone-200 rounded-lg shadow-md text-black active:scale-95 transition-transform"
+        className="lg:hidden absolute top-3.5 right-3 z-30 p-2 bg-white border border-stone-200 rounded-lg shadow-sm text-black active:scale-95 transition-transform"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -53,12 +53,12 @@ export default function Sidebar({ user, view, setView, passwordRequestCount, log
         />
       )}
 
-      {/* Drawer */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-stone-200 flex flex-col h-full 
-        transition-transform duration-300 ease-in-out shadow-2xl
-        ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-      `}>
+  <aside className={`
+  fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-stone-200 flex flex-col
+  transition-transform duration-300 ease-in-out shadow-2xl
+  lg:static lg:z-auto lg:shrink-0 lg:shadow-none lg:translate-x-0
+  ${isOpen ? "translate-x-0" : "-translate-x-full"}
+`}>
         
         <div className="lg:hidden absolute top-4 right-4">
           <button onClick={() => setIsOpen(false)} className="text-black/50 hover:text-black p-1">

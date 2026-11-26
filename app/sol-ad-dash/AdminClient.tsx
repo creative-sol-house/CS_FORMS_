@@ -705,8 +705,8 @@ export default function AdminClient() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#fafaf9] text-black">
-      {isAdmin && (
+<div className="flex flex-col lg:flex-row min-h-screen bg-[#fafaf9] text-black">
+    {isAdmin && (
         <Sidebar
           user={user}
           view={currentTab}
@@ -716,141 +716,113 @@ export default function AdminClient() {
         />
       )}
 
-      <main className={`flex-1 w-full min-w-0 ${isAdmin ? "lg:ml-64 ml-0" : ""} px-2 sm:px-4 lg:px-6 py-3 lg:py-6 overflow-x-hidden pb-24 lg:pb-6`}>
-        {/* ─── HEADER ─── */}
-        <header className="flex flex-col gap-3 mb-4 sm:mb-6">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 sm:gap-3">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-lg sm:text-2xl font-bold text-black tracking-tight truncate">
-                {isAdmin
-                  ? currentTab === "dashboard" ? "Dashboard Overview"
-                    : currentTab === "leads" ? "Total Leads"
-                    : currentTab === "users" ? "User Management"
-                    : currentTab === "user-analysis" ? "User Analysis"
-                    : currentTab === "lead-analysis" ? "Lead Analysis"
-                    : "Password Requests"
-                  : "My Dashboard"}
-              </h1>
-              <p className="text-[11px] sm:text-sm text-black/60 mt-0.5">
-                Manage and track your client inquiries
-              </p>
-            </div>
+      <main className="flex-1 w-full min-w-0 px-3 sm:px-4 lg:px-6 py-3 lg:py-6 overflow-x-hidden pb-24 lg:pb-6">
 
-            {/* ─── HEADER ACTIONS (Fully Responsive) ─── */}
-            <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto mt-1 sm:mt-0">
-              {/* Left cluster: action buttons — wraps on tiny screens */}
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0 flex-1 sm:flex-none">
-                {["dashboard", "leads"].includes(currentTab) && (
-                  <button
-                    onClick={() => openAddLead(undefined)}
-                    className="group relative flex items-center gap-1 px-2.5 py-1.5 sm:px-4 sm:py-2 overflow-hidden bg-indigo-600 border-2 border-indigo-600 text-white hover:text-indigo-700 text-[11px] sm:text-sm font-bold shadow-sm hover:shadow-md rounded-full transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 shrink-0"
-                  >
-                    <span className="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
-                    <svg
-                      className="relative z-10 w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span className="relative z-10">Add</span>
-                  </button>
-                )}
+<header className="mb-4 sm:mb-6 space-y-3">
+  {/* Row 1: title + profile */}
+  <div className={`flex items-center justify-between gap-3 ${isAdmin ? "pr-12 lg:pr-0" : ""}`}>
+    <div className="min-w-0 flex-1">
+      <h1 className="text-base sm:text-2xl font-bold text-black tracking-tight truncate">
+        {isAdmin
+          ? currentTab === "dashboard" ? "Dashboard Overview"
+            : currentTab === "leads" ? "Total Leads"
+            : currentTab === "users" ? "User Management"
+            : currentTab === "user-analysis" ? "User Analysis"
+            : currentTab === "lead-analysis" ? "Lead Analysis"
+            : "Password Requests"
+          : "My Dashboard"}
+      </h1>
+      <p className="hidden sm:block text-sm text-black/60 mt-0.5">
+        Manage and track your client inquiries
+      </p>
+    </div>
 
-                <Link
-                  href="/sol-ad-dash/my-analytics"
-                  className="group relative flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 overflow-hidden bg-white border-2 border-indigo-200 hover:border-indigo-500 text-indigo-600 hover:text-white text-[11px] sm:text-sm font-bold shadow-sm hover:shadow-md rounded-full transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 shrink-0"
-                >
-                  <span className="absolute inset-0 bg-gradient-to-t from-indigo-600 to-indigo-500 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
-                  <svg
-                    className="relative z-10 w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-300 group-hover:rotate-[-8deg] group-hover:scale-110"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                    />
-                  </svg>
-                  <span className="relative z-10 hidden xs:inline">My Analytics</span>
-                  <span className="relative z-10 xs:hidden">Analytics</span>
-                  <span className="relative z-10 text-[10px] sm:text-xs opacity-0 -ml-1 w-0 group-hover:opacity-100 group-hover:w-auto group-hover:ml-0 group-hover:animate-pulse transition-all duration-300">
-                    ✨
-                  </span>
-                </Link>
+    {/* Profile (same position for admin + employee, never fixed) */}
+    <div ref={settingsRef} className="relative shrink-0">
+      <button
+        onClick={() => setSettingsOpen(!settingsOpen)}
+        className="flex items-center gap-2 p-1 md:pl-1 md:pr-3 bg-white border border-stone-200 hover:border-indigo-300 rounded-full shadow-sm transition-colors"
+      >
+        <div className="w-8 h-8 rounded-full bg-stone-900 text-white flex items-center justify-center font-bold text-sm overflow-hidden shrink-0">
+          {user.profilePicture ? (
+            <img src={user.profilePicture} alt="Me" className="w-full h-full object-cover" />
+          ) : (
+            user.name.charAt(0).toUpperCase()
+          )}
+        </div>
+        <div className="hidden md:block text-left min-w-0">
+          <p className="text-sm font-semibold text-black leading-tight truncate max-w-[120px]">{user.name}</p>
+          <p className="text-[10px] text-black/60 uppercase tracking-wider">{user.role.replace("_", " ")}</p>
+        </div>
+        <svg
+          className={`hidden md:block w-3.5 h-3.5 text-black/50 transition-transform ${settingsOpen ? "rotate-180" : ""}`}
+          fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
 
-                <div className="shrink-0">
-                  <InstallButton />
-                </div>
-              </div>
-
-              {/* Right cluster: Profile box */}
-              <div className="relative shrink-0" ref={settingsRef}>
-                <button
-                  onClick={() => setSettingsOpen(!settingsOpen)}
-                  className="group relative flex items-center gap-1.5 sm:gap-3 px-1.5 sm:px-3 py-1.5 overflow-hidden bg-white border-2 border-stone-200 hover:border-indigo-300 rounded-full sm:rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
-                >
-                  <span className="absolute inset-0 bg-indigo-50 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
-                  <div className="relative z-10 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-stone-900 text-white flex items-center justify-center font-bold text-xs sm:text-sm overflow-hidden shrink-0 ring-2 ring-transparent group-hover:ring-indigo-300 transition-all duration-300">
-                    {user.profilePicture ? (
-                      <img src={user.profilePicture} alt="Me" className="w-full h-full object-cover" />
-                    ) : (
-                      user.name.charAt(0).toUpperCase()
-                    )}
-                  </div>
-                  <div className="relative z-10 text-left hidden sm:block">
-                    <p className="text-sm font-semibold text-black leading-tight">{user.name}</p>
-                    <p className="text-[10px] text-black/60 uppercase tracking-wider">{user.role.replace("_", " ")}</p>
-                  </div>
-                  <svg
-                    className={`relative z-10 w-3.5 h-3.5 text-black/50 group-hover:text-indigo-600 transition-all duration-300 ${settingsOpen ? "rotate-180" : ""}`}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {settingsOpen && (
-                  <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1rem)] bg-white border border-stone-200 rounded-2xl shadow-xl z-50 overflow-hidden">
-                    <div className="p-4 border-b border-stone-100 bg-stone-50">
-                      <p className="text-sm font-semibold text-black truncate">{user.name}</p>
-                      <p className="text-xs text-black/60 truncate">{user.email}</p>
-                    </div>
-                    <div className="p-2 space-y-1">
-                      <button
-                        onClick={requestPassword}
-                        className="group w-full text-left px-3 py-2 text-sm text-black hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-2 transition-colors"
-                      >
-                        <svg className="w-4 h-4 text-black/50 group-hover:text-indigo-600 group-hover:rotate-12 transition-all" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                        </svg>
-                        Request Password Change
-                      </button>
-                      <button
-                        onClick={logout}
-                        className="group w-full text-left px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-xl flex items-center gap-2 transition-colors"
-                      >
-                        <svg className="w-4 h-4 text-rose-500 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Sign Out
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+      {settingsOpen && (
+        <div className="absolute right-0 top-full mt-2 w-56 max-w-[calc(100vw-1.5rem)] bg-white border border-stone-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+          <div className="p-3 border-b border-stone-100 bg-stone-50">
+            <p className="text-sm font-semibold text-black truncate">{user.name}</p>
+            <p className="text-xs text-black/60 truncate">{user.email}</p>
           </div>
-        </header>
+          <div className="p-2 space-y-1">
+            <button
+              onClick={requestPassword}
+              className="w-full text-left px-3 py-2 text-sm text-black hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-2 transition-colors"
+            >
+              <svg className="w-4 h-4 text-black/50" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+              Request Password Change
+            </button>
+            <button
+              onClick={logout}
+              className="w-full text-left px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-xl flex items-center gap-2 transition-colors"
+            >
+              <svg className="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
 
+  {/* Row 2: actions */}
+  <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
+    {["dashboard", "leads"].includes(currentTab) && (
+      <button
+        onClick={() => openAddLead(undefined)}
+        className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold rounded-full shadow-sm active:scale-95 transition"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+        Add
+      </button>
+    )}
+
+    <Link
+      href="/sol-ad-dash/my-analytics"
+      className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-600 text-xs sm:text-sm font-semibold rounded-full shadow-sm active:scale-95 transition"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+      <span className="sm:hidden">Analytics</span>
+      <span className="hidden sm:inline">My Analytics</span>
+    </Link>
+
+    <div className="shrink-0">
+      <InstallButton />
+    </div>
+  </div>
+</header>
         {user.passwordRequest && (
           <div className="mb-3 p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs sm:text-sm">
             ⏳ Your password reset request is pending admin approval. A new password will be emailed to you.
