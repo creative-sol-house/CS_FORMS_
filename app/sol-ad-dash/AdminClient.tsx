@@ -9,6 +9,8 @@ import UserAnalysisPanel from "@/components/UserAnalysisPanel";
 import ManageLeadModal from "@/components/ManageLeadModal";
 import ChatModal from "@/components/ChatModal";
 import LeadForm from "@/components/LeadForm";
+import InstallButton from "@/components/install-button";
+
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -785,6 +787,7 @@ export default function AdminClient() {
         ✨
       </span>
     </Link>
+    <InstallButton />
   </div>
 
   {/* Profile Box */}

@@ -1,27 +1,17 @@
-
 import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "My Full Stack Application",
-    short_name: "Inquiry Form",
-    description: " A full stack application for managing Leads.",
- start_url: "/sol-ad-dash/",
-    scope: "/sol-ad-dash/",
+    name: "Your App Name",
+    short_name: "YourApp",
+    start_url: "/sol-ad-dash",
+    scope: "/",
     display: "standalone",
     background_color: "#ffffff",
-    theme_color: "#111827",
+    theme_color: "#000000",
     icons: [
-      {
-        src: "/sol-ad-dash/icons/icon-192.png",
-        sizes: "192x192",
-        type: "image/png",
-      },
-      {
-        src: "/sol-ad-dash/icons/icon-512.png",
-        sizes: "512x512",
-        type: "image/png",
-      },
+      { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }
