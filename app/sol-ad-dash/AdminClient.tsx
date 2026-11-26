@@ -795,27 +795,55 @@ export default function AdminClient() {
 
   {/* Row 2: actions */}
   <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0">
-    {["dashboard", "leads"].includes(currentTab) && (
+ {["dashboard", "leads"].includes(currentTab) && (
       <button
         onClick={() => openAddLead(undefined)}
-        className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold rounded-full shadow-sm active:scale-95 transition"
+        className="group relative flex items-center gap-1 px-3 py-1.5 sm:px-4 sm:py-2 overflow-hidden bg-indigo-600 border-2 border-indigo-600 text-white hover:text-indigo-700 text-[11px] sm:text-sm font-bold shadow-sm hover:shadow-md rounded-full transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 shrink-0"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+        {/* Fill-up layer (white slides up on hover) */}
+        <span className="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+
+        <svg
+          className="relative z-10 w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
-        Add
+        <span className="relative z-10">Add</span>
       </button>
     )}
 
+    {/* ✨ Cute Animated My Analytics Button */}
     <Link
       href="/sol-ad-dash/my-analytics"
-      className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-600 text-xs sm:text-sm font-semibold rounded-full shadow-sm active:scale-95 transition"
+      className="group relative flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 overflow-hidden bg-white border-2 border-indigo-200 hover:border-indigo-500 text-indigo-600 hover:text-white text-[11px] sm:text-sm font-bold shadow-sm hover:shadow-md rounded-full transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 shrink-0"
     >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      {/* Fill-up layer */}
+      <span className="absolute inset-0 bg-gradient-to-t from-indigo-600 to-indigo-500 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+
+      <svg
+        className="relative z-10 w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-300 group-hover:rotate-[-8deg] group-hover:scale-110"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+        />
       </svg>
-      <span className="sm:hidden">Analytics</span>
-      <span className="hidden sm:inline">My Analytics</span>
+
+      <span className="relative z-10">My Analytics</span>
+
+      {/* Sparkle pops in on hover */}
+      <span className="relative z-10 text-[10px] sm:text-xs opacity-0 -ml-1 w-0 group-hover:opacity-100 group-hover:w-auto group-hover:ml-0 group-hover:animate-pulse transition-all duration-300">
+        ✨
+      </span>
     </Link>
 
     <div className="shrink-0">
