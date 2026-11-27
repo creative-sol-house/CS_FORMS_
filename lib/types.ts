@@ -29,6 +29,12 @@ export interface SubmissionLocation {
   referer?: string;
 }
 
+export interface IndustrySuggestion {
+  name: string;
+  count: number;      // how many leads use it
+  exact: boolean;     // true = exact match to query
+}
+
 export interface InquiryData {
   serviceCategory?: ServiceCategory;
   fullName?: string;
@@ -38,6 +44,7 @@ export interface InquiryData {
   consultantName: string;
   consultantId?: string;
 country?: string;
+ industry?: string; 
   // ✅ NEW — client region classification
   isInternationalClient?: boolean;
   clientRegion?: "Local" | "International";

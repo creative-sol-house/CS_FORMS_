@@ -72,6 +72,7 @@ export default function AdminClient() {
   const [dateTo, setDateTo] = useState("");
   const [creatorFilter, setCreatorFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [industryFilter, setIndustryFilter] = useState<string>(""); // ✅ NEW
   const [onlyUnread, setOnlyUnread] = useState(false);
   
   const [regionFilter, setRegionFilter] = useState<"All" | "Local" | "International">("All");
@@ -81,6 +82,7 @@ export default function AdminClient() {
   const [bdDateTo, setBdDateTo] = useState("");
   const [bdServiceFilter, setBdServiceFilter] = useState<ServiceFilter>("All");
   const [bdStatusFilter, setBdStatusFilter] = useState<string>("");
+  const [bdIndustryFilter, setBdIndustryFilter] = useState<string>(""); // ✅ NEW
   const [bdOnlyMine, setBdOnlyMine] = useState(false);
   const [bdOnlyUnread, setBdOnlyUnread] = useState(false);
 
@@ -100,6 +102,16 @@ export default function AdminClient() {
   const isAdmin = user?.role === "admin";
   const passwordRequests = allUsers.filter((u) => u.passwordRequest === true);
   const developers = allUsers.filter((u) => u.role === "business_developer");
+
+  // ✅ Build dynamic list of industries for the filter dropdown
+  const industryOptions = useMemo(() => {
+    const set = new Set<string>();
+    inquiries.forEach((i) => {
+      const ind = (i as any).industry;
+      if (ind && ind.trim()) set.add(ind.trim());
+    });
+    return Array.from(set).sort();
+  }, [inquiries]);
 
   const canEditLead = (lead: InquiryDoc): boolean => {
     if (!user) return false;
@@ -447,6 +459,10 @@ export default function AdminClient() {
     return inquiries.filter((i) => {
       if (filter !== "All" && i.serviceCategory !== filter) return false;
       if (statusFilter && i.status !== statusFilter) return false;
+      
+      // ✅ Industry filter (Admin)
+      if (industryFilter && ((i as any).industry || "") !== industryFilter) return false;
+
       if (regionFilter !== "All") {
         const intl = isInternationalLead(i);
         if (regionFilter === "International" && !intl) return false;
@@ -468,11 +484,12 @@ export default function AdminClient() {
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inquiries, filter, statusFilter, creatorFilter, dateFrom, dateTo, search, allUsers, onlyUnread, user, regionFilter]);
+  }, [inquiries, filter, statusFilter, industryFilter, creatorFilter, dateFrom, dateTo, search, allUsers, onlyUnread, user, regionFilter]);
 
   const activeFiltersCount =
     (filter !== "All" ? 1 : 0) +
     (statusFilter ? 1 : 0) +
+    (industryFilter ? 1 : 0) + // ✅ Added
     (creatorFilter ? 1 : 0) +
     (dateFrom ? 1 : 0) +
     (dateTo ? 1 : 0) +
@@ -483,6 +500,7 @@ export default function AdminClient() {
   const clearFilters = () => {
     setFilter("All");
     setStatusFilter("");
+    setIndustryFilter(""); // ✅ Added
     setCreatorFilter("");
     setDateFrom("");
     setDateTo("");
@@ -504,6 +522,10 @@ export default function AdminClient() {
     return inquiries.filter((i) => {
       if (bdServiceFilter !== "All" && i.serviceCategory !== bdServiceFilter) return false;
       if (bdStatusFilter && i.status !== bdStatusFilter) return false;
+      
+      // ✅ Industry filter (BD)
+      if (bdIndustryFilter && ((i as any).industry || "") !== bdIndustryFilter) return false;
+
       if (bdOnlyUnread && user && unreadCountFor(i, user.name) === 0) return false;
 
       if (bdRegionFilter !== "All") {
@@ -539,7 +561,7 @@ export default function AdminClient() {
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inquiries, bdServiceFilter, bdStatusFilter, bdOnlyMine, bdDateFrom, bdDateTo, bdOnlyUnread, user, bdRegionFilter, bdSearch]);
+  }, [inquiries, bdServiceFilter, bdStatusFilter, bdIndustryFilter, bdOnlyMine, bdDateFrom, bdDateTo, bdOnlyUnread, user, bdRegionFilter, bdSearch]);
 
   const bdSummary = useMemo(() => {
     const rangeFiltered = inquiries.filter((i) =>
@@ -568,6 +590,7 @@ export default function AdminClient() {
   const bdActiveFilters =
     (bdServiceFilter !== "All" ? 1 : 0) +
     (bdStatusFilter ? 1 : 0) +
+    (bdIndustryFilter ? 1 : 0) + // ✅ Added
     (bdOnlyMine ? 1 : 0) +
     (bdOnlyUnread ? 1 : 0) +
     (bdDateFrom ? 1 : 0) +
@@ -578,6 +601,7 @@ export default function AdminClient() {
   const clearBdFilters = () => {
     setBdServiceFilter("All");
     setBdStatusFilter("");
+    setBdIndustryFilter(""); // ✅ Added
     setBdOnlyMine(false);
     setBdOnlyUnread(false);
     setBdDateFrom("");
@@ -998,6 +1022,12 @@ export default function AdminClient() {
                       <div className="flex items-center gap-1.5 mt-1 text-[10px] text-stone-500 flex-wrap">
                         <span className="truncate">{i.serviceCategory}</span>
                         <span>·</span>
+                        {(i as any).industry && (
+                          <>
+                            <span className="truncate text-indigo-600 font-medium">{(i as any).industry}</span>
+                            <span>·</span>
+                          </>
+                        )}
                         <span className="truncate">{creator}</span>
                         <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${badge.cls}`}>{badge.label}</span>
                         <span className="ml-auto">{new Date(i.createdAt).toLocaleDateString()}</span>
@@ -1008,13 +1038,14 @@ export default function AdminClient() {
               </ul>
 
               <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-sm table-fixed min-w-180">
+                <table className="w-full text-sm table-fixed min-w-[850px]">
                   <thead>
                     <tr className="border-b border-stone-200 bg-white">
-                      <th className="w-[32%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Client</th>
-                      <th className="w-[20%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Service</th>
-                      <th className="w-[24%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Created By</th>
-                      <th className="w-[16%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Status</th>
+                      <th className="w-[28%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Client</th>
+                      <th className="w-[15%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Service</th>
+                      <th className="w-[15%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Industry</th>
+                      <th className="w-[22%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Created By</th>
+                      <th className="w-[12%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-left">Status</th>
                       <th className="w-[8%] px-3 py-2 font-semibold text-stone-500 text-[10px] uppercase tracking-wider text-right">Date</th>
                     </tr>
                   </thead>
@@ -1035,6 +1066,7 @@ export default function AdminClient() {
                             <div className="text-[10px] text-stone-500 truncate">{getLeadSubtitle(i)}</div>
                           </td>
                           <td className="px-3 py-2 text-[11px] text-stone-700 truncate">{i.serviceCategory}</td>
+                          <td className="px-3 py-2 text-[11px] text-indigo-700 font-medium truncate">{(i as any).industry || "—"}</td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-1 min-w-0">
                               <span className="text-[11px] text-stone-700 truncate">{creator}</span>
@@ -1078,7 +1110,9 @@ export default function AdminClient() {
                 value={bdSearch}
                 onChange={(e) => setBdSearch(e.target.value)}
               />
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2">
+              
+              {/* ✅ Added lg:grid-cols-6 to fit Industry */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2">
                 <div>
                   <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">From</label>
                   <input type="date" value={bdDateFrom} onChange={(e) => setBdDateFrom(e.target.value)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px]" />
@@ -1091,6 +1125,13 @@ export default function AdminClient() {
                   <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Service</label>
                   <select value={bdServiceFilter} onChange={(e) => setBdServiceFilter(e.target.value as ServiceFilter)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px] bg-white">
                     {SERVICE_TABS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Industry</label>
+                  <select value={bdIndustryFilter} onChange={(e) => setBdIndustryFilter(e.target.value)} className="w-full px-2 py-1 border border-stone-300 rounded-lg text-[11px] bg-white">
+                    <option value="">Any</option>
+                    {industryOptions.map((ind) => <option key={ind} value={ind}>{ind}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1182,6 +1223,17 @@ export default function AdminClient() {
                           </span>
                         )}
                       </div>
+                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-stone-500 flex-wrap">
+                        <span className="truncate">{i.serviceCategory}</span>
+                        <span>·</span>
+                        {(i as any).industry && (
+                          <>
+                            <span className="truncate text-indigo-600 font-medium">{(i as any).industry}</span>
+                            <span>·</span>
+                          </>
+                        )}
+                        <span className="truncate">{creator}</span>
+                      </div>
                       {i.assignedTo && (
                         <div className="mt-1 text-[10px] font-medium flex items-center gap-1 flex-wrap">
                           <span className="text-stone-500">Assigned to:</span>
@@ -1222,14 +1274,14 @@ export default function AdminClient() {
               </ul>
 
               <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-sm table-fixed min-w-180">
+                <table className="w-full text-sm table-fixed min-w-[850px]">
                   <thead>
                     <tr className="bg-stone-50 border-b border-stone-200 text-left">
-                      <th className="w-[26%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
-                      <th className="w-[18%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Created By</th>
-                      <th className="w-[18%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Assigned To</th>
-                      <th className="w-[16%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Status</th>
-                      <th className="w-[14%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Service</th>
+                      <th className="w-[24%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
+                      <th className="w-[16%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Created By</th>
+                      <th className="w-[14%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Industry</th>
+                      <th className="w-[16%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Assigned To</th>
+                      <th className="w-[14%] px-3 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Status</th>
                       <th className="w-[8%] px-3 py-2"></th>
                     </tr>
                   </thead>
@@ -1267,6 +1319,9 @@ export default function AdminClient() {
                               </span>
                             </div>
                           </td>
+                          <td className="px-3 py-2 text-[11px] text-indigo-700 font-medium truncate">
+                            {(i as any).industry || "—"}
+                          </td>
                           <td className="px-3 py-2">
                             {i.assignedTo ? (
                               <div className="flex flex-col gap-0.5">
@@ -1292,9 +1347,6 @@ export default function AdminClient() {
                             >
                               {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                             </select>
-                          </td>
-                          <td className="px-3 py-2 text-[11px] text-black/70 truncate">
-                            {i.serviceCategory || "General"}
                           </td>
                           <td className="px-3 py-2">
                             <div className="flex items-center justify-end gap-1">
@@ -1359,7 +1411,8 @@ export default function AdminClient() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 bg-white border border-stone-200 rounded-lg p-2">
+              {/* ✅ Added lg:grid-cols-6 to fit Industry */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 bg-white border border-stone-200 rounded-lg p-2">
                 <div>
                   <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">From</label>
                   <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs" />
@@ -1373,6 +1426,13 @@ export default function AdminClient() {
                   <select value={creatorFilter} onChange={(e) => setCreatorFilter(e.target.value)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs bg-white">
                     <option value="">Anyone</option>
                     {creatorOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[9px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Industry</label>
+                  <select value={industryFilter} onChange={(e) => setIndustryFilter(e.target.value)} className="w-full px-1.5 py-1 border border-stone-300 rounded-md text-[10px] sm:text-xs bg-white">
+                    <option value="">Any</option>
+                    {industryOptions.map((ind) => <option key={ind} value={ind}>{ind}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1444,6 +1504,12 @@ export default function AdminClient() {
                         <span className={`px-0.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider border ${badge.cls}`}>{badge.label}</span>
                         <span>·</span>
                         <span className="truncate">{i.serviceCategory || "General"}</span>
+                        {(i as any).industry && (
+                          <>
+                            <span>·</span>
+                            <span className="truncate text-indigo-600 font-medium">{(i as any).industry}</span>
+                          </>
+                        )}
                         {i.assignedTo && <span className="truncate ml-auto">→ {i.assignedTo}</span>}
                       </div>
                       <div className="flex items-center gap-1 mt-1.5">
@@ -1479,20 +1545,21 @@ export default function AdminClient() {
               </ul>
 
               <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-sm table-fixed min-w-180">
+                <table className="w-full text-sm table-fixed min-w-[900px]">
                   <thead>
                     <tr className="bg-stone-50 border-b border-stone-200 text-left">
-                      <th className="w-[26%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
-                      <th className="w-[18%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Created By</th>
-                      <th className="w-[14%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Status</th>
-                      <th className="w-[16%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Assigned</th>
-                      <th className="w-[14%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Service</th>
-                      <th className="w-[12%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider text-right">Actions</th>
+                      <th className="w-[24%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Client</th>
+                      <th className="w-[16%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Created By</th>
+                      <th className="w-[14%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Industry</th>
+                      <th className="w-[12%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Status</th>
+                      <th className="w-[14%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Assigned</th>
+                      <th className="w-[12%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider">Service</th>
+                      <th className="w-[8%] px-2.5 py-2 font-semibold text-black text-[10px] uppercase tracking-wider text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {filtered.length === 0 ? (
-                      <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-black/50">No leads match these filters.</td></tr>
+                      <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-black/50">No leads match these filters.</td></tr>
                     ) : filtered.map((i) => {
                       const creator = getCreatorName(i);
                       const role = getCreatorRole(i);
@@ -1515,6 +1582,9 @@ export default function AdminClient() {
                               <span className="text-[11px] text-stone-700 truncate">{creator}</span>
                               <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border shrink-0 ${badge.cls}`}>{badge.label}</span>
                             </div>
+                          </td>
+                          <td className="px-2.5 py-2 text-[11px] text-indigo-700 font-medium truncate">
+                            {(i as any).industry || "—"}
                           </td>
                           <td className="px-2.5 py-2">
                             <select

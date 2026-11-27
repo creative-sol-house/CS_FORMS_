@@ -50,6 +50,7 @@ const InquirySchema = new Schema<IInquiry>(
     consultantId: { type: String, trim: true },
         // ✅ NEW FIELDS
     country: { type: String, trim: true },
+    industry: { type: String, trim: true, default: "", index: true },
     isInternationalClient: { type: Boolean, default: false, index: true },
 clientRegion: {
   type: String,

@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { InquiryDoc, UserDoc, LeadAttachment } from "@/lib/types";
 import CustomSelect from "./CustomSelect";
+import IndustrySelect from "./IndustrySelect";
 
 const STATUS_OPTIONS = ["Interested", "Pending", "Call Back", "Approved", "Not Interested"];
 
@@ -65,11 +66,64 @@ export default function ManageLeadModal({
   const [savingNotes, setSavingNotes] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
 
+  // ✅ Industry — local mirror so the modal reflects changes immediately
+  const [industry, setIndustry] = useState<string>((lead as any).industry || "");
+  const [savingIndustry, setSavingIndustry] = useState(false);
+  const [industryErr, setIndustryErr] = useState("");
+
+  useEffect(() => {
+    setIndustry((lead as any).industry || "");
+  }, [(lead as any).industry]);
+
   const saveNotes = async () => {
     if (notes.trim() === (lead.notes || "").trim()) return;
     setSavingNotes(true);
     await onUpdate({ notes: notes.trim() });
     setSavingNotes(false);
+  };
+
+  // ✅ Industry save — server returns 409 when a similar name exists; retry with force.
+  const saveIndustry = async (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed === ((lead as any).industry || "").trim()) return;
+
+    setSavingIndustry(true);
+    setIndustryErr("");
+    try {
+      const doFetch = (force: boolean) =>
+        fetch("/api/admin/inquiries", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: lead._id,
+            updates: force
+              ? { industry: trimmed, forceIndustry: true }
+              : { industry: trimmed },
+          }),
+        }).then((r) => r.json());
+
+      let json = await doFetch(false);
+
+      if (!json.success && json.needsConfirmation) {
+        if (confirm(json.error)) {
+          json = await doFetch(true);
+        } else {
+          // user cancelled — revert input to previous value
+          setIndustry((lead as any).industry || "");
+          return;
+        }
+      }
+
+      if (!json.success) throw new Error(json.error || "Failed to save industry");
+
+      // onUpdate triggers parent refresh (also updates via SSE)
+      onUpdate({ industry: trimmed });
+    } catch (e: any) {
+      setIndustryErr(e.message);
+      setIndustry((lead as any).industry || "");
+    } finally {
+      setSavingIndustry(false);
+    }
   };
 
   const logs = useMemo(
@@ -216,6 +270,8 @@ export default function ManageLeadModal({
                     <Cell label="Designation" value={lead.designation} />
                     <Cell label="Requirement" value={lead.requirementType} />
                     <Cell label="Service" value={lead.serviceCategory} bold />
+                    {/* ✅ NEW — Industry */}
+                    <Cell label="Industry" value={(lead as any).industry} bold />
                     <Cell label="Contact Via" value={lead.preferredContactMethod} />
                     <Cell label="Best Time" value={lead.preferredContactTime} />
                     <Cell
@@ -337,15 +393,14 @@ export default function ManageLeadModal({
                                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isNote ? "bg-emerald-100 text-emerald-800" : "bg-indigo-100 text-indigo-800"}`}>{log.action}</span>
                                 <span className="text-[10px] font-medium text-stone-400">{new Date(log.timestamp).toLocaleString()}</span>
                               </div>
-                              {/* Replace the single <p> with this: */}
-<div className="text-sm text-stone-700 space-y-1">
-  {(log.details || "").split(" · ").map((part, j) => (
-    <div key={j} className="flex items-start gap-2">
-      <span className="text-stone-400 mt-0.5">•</span>
-      <span className="break-words">{part}</span>
-    </div>
-  ))}
-</div>
+                              <div className="text-sm text-stone-700 space-y-1">
+                                {(log.details || "").split(" · ").map((part, j) => (
+                                  <div key={j} className="flex items-start gap-2">
+                                    <span className="text-stone-400 mt-0.5">•</span>
+                                    <span className="break-words">{part}</span>
+                                  </div>
+                                ))}
+                              </div>
                               <p className="text-[10px] text-stone-400 mt-1">by {log.performedBy}</p>
                             </div>
                           </div>
@@ -378,6 +433,29 @@ export default function ManageLeadModal({
                       />
                     </div>
                   )}
+
+                  {/* ✅ NEW — Industry (inline edit) */}
+                  <div className="pt-4 border-t border-stone-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider">
+                        Industry
+                      </label>
+                      {savingIndustry && (
+                        <span className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+                      )}
+                    </div>
+                    <IndustrySelect
+                      value={industry}
+                      disabled={savingIndustry || !canEdit}
+                      onChange={(v) => {
+                        setIndustry(v);
+                        saveIndustry(v);
+                      }}
+                    />
+                    {industryErr && (
+                      <p className="mt-1 text-[11px] text-rose-600 font-medium">{industryErr}</p>
+                    )}
+                  </div>
 
                   <div className="pt-4 border-t border-stone-100">
                     <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-2">Internal Notes</label>
@@ -753,6 +831,11 @@ function PrintSheet({
                 <span className="pf-meta-key">Category:</span>
                 <span className="pf-meta-val">{lead.serviceCategory || "—"}</span>
               </div>
+              {/* ✅ NEW — Industry in print metadata */}
+              <div className="pf-meta-row">
+                <span className="pf-meta-key">Industry:</span>
+                <span className="pf-meta-val">{(lead as any).industry || "—"}</span>
+              </div>
               <div className="pf-meta-row">
                 <span className="pf-meta-key">Region:</span>
                 <span className="pf-meta-val">{printRegionLabel}</span>
@@ -886,6 +969,10 @@ function buildPrintSections(lead: InquiryDoc): {
   addClient("Email Address", lead.email);
   addClient("Phone Number", lead.phone);
   addClient("Company / Organization", lead.companyName);
+
+  // ✅ NEW — Industry in the printed client section
+  addClient("Industry", (lead as any).industry);
+
   addClient("Designation / Role", lead.designation);
   addClient("Consultant Name", lead.consultantName);
   addClient("Preferred Contact Method", lead.preferredContactMethod);
@@ -944,6 +1031,8 @@ const HIDDEN_LEAD_FIELDS = new Set([
   "leadCreatedAt", "source",
   // ✅ Hide region flags and socials — they have dedicated cells
   "country", "location", "isInternationalClient", "clientRegion", "socialLinks",
+  // ✅ Industry is surfaced in the "General Information" card + printed client section
+  "industry",
 ]);
 
 function getVisibleLeadFields(lead: InquiryDoc): [string, unknown][] {

@@ -12,7 +12,7 @@ import {
 import { broadcastLeadUpdate } from "./stream/route";
 import cloudinary from "cloudinary";
 import { buildFieldDiffs, diffAttachments } from "@/lib/auditDiff";
-
+import { getIndustrySuggestions, findIndustryConflict } from "@/lib/industry";
 
 async function getSession() {
   const cookieStore = await cookies();
@@ -24,6 +24,8 @@ async function getSession() {
 // ─────────────────────────────────────────────────────────────
 // GET — list leads (admin) / list assigned-or-created leads (developer)
 //       Supports ?focus=<id> to return a single lead (fast poll)
+//       Supports ?industries=<q> for industry autocomplete
+//       Supports ?industry=<name> to filter leads by industry
 // ─────────────────────────────────────────────────────────────
 export async function GET(req: Request) {
   try {
@@ -34,9 +36,17 @@ export async function GET(req: Request) {
         { status: 401 }
       );
 
+    const url = new URL(req.url);
+
+    // ✅ NEW — industry autocomplete: GET /api/admin/inquiries?industries=pow
+    if (url.searchParams.has("industries")) {
+      const q = url.searchParams.get("industries") || "";
+      const suggestions = await getIndustrySuggestions(q, 15);
+      return NextResponse.json({ success: true, suggestions });
+    }
+
     await connectDB();
 
-    const url = new URL(req.url);
     const focus = url.searchParams.get("focus");
 
     if (focus) {
@@ -59,7 +69,7 @@ export async function GET(req: Request) {
     }
 
     // ✅ already correct: created OR assigned
-    const query =
+    const baseQuery =
       session.role === "admin"
         ? {}
         : {
@@ -68,6 +78,13 @@ export async function GET(req: Request) {
               { createdById: session.userId },
             ],
           };
+
+    // ✅ NEW — optional industry filter
+    const industry = url.searchParams.get("industry")?.trim();
+    const query =
+      industry && industry !== "all"
+        ? { ...baseQuery, $and: [{ industry: industry }] }
+        : baseQuery;
 
     const inquiries = await Inquiry.find(query)
       .sort({ createdAt: -1 })
@@ -96,18 +113,37 @@ export async function POST(req: Request) {
 
     await connectDB();
     const body = await req.json();
-// Email is optional; validate only when provided
-body.email = body.email?.trim() || "";
 
-if (
-  body.email &&
-  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)
-) {
-  return NextResponse.json(
-    { success: false, error: "Invalid email address" },
-    { status: 400 }
-  );
-}
+    // Email is optional; validate only when provided
+    body.email = body.email?.trim() || "";
+
+    if (body.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid email address" },
+        { status: 400 }
+      );
+    }
+
+    // ✅ NEW — industry accuracy guard (warn on similar existing names)
+    if (body.industry && !body.forceIndustry) {
+      const { similar } = await findIndustryConflict(body.industry, {
+        allowExact: true,
+      });
+      if (similar.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            needsConfirmation: true,
+            error: `Similar industries already exist: ${similar
+              .slice(0, 3)
+              .join(", ")}. Add anyway?`,
+            similar,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     // ── Normalize the user-supplied "Lead Created" timestamp ────────────────
     let leadCreatedAt: Date;
     if (body.leadCreatedAt) {
@@ -133,11 +169,15 @@ if (
       attachments: Array.isArray(body.attachments) ? body.attachments : [],
       leadCreatedAt,
 
+      // ✅ NEW — canonical industry (trimmed)
+      industry: (body.industry || "").trim(),
+
       auditLogs: [
         {
           action: "Created",
           details:
             `Lead created by ${session.name} (${session.role})` +
+            (body.industry ? ` · industry "${body.industry.trim()}"` : "") +
             (isBackdated
               ? ` · backdated to ${leadCreatedAt.toLocaleString()}`
               : ""),
@@ -162,8 +202,33 @@ if (
     };
     delete (payload as any).newMessage;
     delete (payload as any).markRead;
+    delete (payload as any).forceIndustry;
 
     const lead = await Inquiry.create(payload);
+
+    // ✅ NEW — keep the GlobalIndustry registry in sync (upsert + increment usage)
+    try {
+      const GlobalIndustry = (await import("@/lib/GlobalIndustry")).default;
+      const { normalizeIndustry } = await import("@/lib/industry");
+      const rawIndustry = (payload.industry || "").trim();
+      if (rawIndustry) {
+        await GlobalIndustry.updateOne(
+          { normalized: normalizeIndustry(rawIndustry) },
+          {
+            $inc: { usageCount: 1 },
+            $setOnInsert: {
+              name: rawIndustry,
+              normalized: normalizeIndustry(rawIndustry),
+              createdBy: session.name,
+              createdById: session.userId,
+            },
+          },
+          { upsert: true }
+        );
+      }
+    } catch (e) {
+      console.error("GlobalIndustry sync (POST) failed:", e);
+    }
 
     // ── Email every admin
     try {
@@ -193,11 +258,8 @@ if (
 
 // ─────────────────────────────────────────────────────────────
 // PATCH — update lead fields, notes, assignment, chat messages,
-//         read receipts, attachments, and broadcast changes via SSE
-// ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────
-// PATCH — update lead fields, notes, assignment, chat messages,
-//         read receipts, attachments, and broadcast changes via SSE
+//         read receipts, attachments, bulk-assign industry,
+//         and broadcast changes via SSE
 // ─────────────────────────────────────────────────────────────
 export async function PATCH(req: Request) {
   try {
@@ -217,6 +279,122 @@ export async function PATCH(req: Request) {
         { status: 400 }
       );
 
+    // ─────────────────────────────────────────────────────────
+    // ✅ BULK ASSIGN INDUSTRY
+    // id === "__bulk_industry__", updates = { ids[], industry, force? }
+    // ─────────────────────────────────────────────────────────
+    if (id === "__bulk_industry__") {
+      const { ids, industry, force } = updates as {
+        ids: string[];
+        industry: string;
+        force?: boolean;
+      };
+
+      if (!Array.isArray(ids) || !industry?.trim()) {
+        return NextResponse.json(
+          { success: false, error: "ids and industry required" },
+          { status: 400 }
+        );
+      }
+
+      // accuracy guard: warn on similar existing industries unless force=true
+      if (!force) {
+        const { similar } = await findIndustryConflict(industry.trim(), {
+          allowExact: true,
+        });
+        if (similar.length > 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              needsConfirmation: true,
+              error: `Similar industries already exist: ${similar
+                .slice(0, 3)
+                .join(", ")}. Add anyway?`,
+              similar,
+            },
+            { status: 409 }
+          );
+        }
+      }
+
+      // permission: non-admin can only touch leads they created or are assigned to
+      const leads = await Inquiry.find({ _id: { $in: ids } }).select(
+        "_id createdById assignedTo"
+      );
+      const allowed = leads.filter((l: any) => {
+        if (session.role === "admin") return true;
+        return (
+          l.createdById === session.userId || l.assignedTo === session.name
+        );
+      });
+      const allowedIds = allowed.map((l) => l._id.toString());
+
+      if (allowedIds.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "No permitted leads" },
+          { status: 403 }
+        );
+      }
+
+      const now = new Date();
+      const cleanIndustry = industry.trim();
+
+      await Inquiry.updateMany(
+        { _id: { $in: allowedIds } },
+        {
+          $set: { industry: cleanIndustry },
+          $push: {
+            auditLogs: {
+              action: "Industry",
+              details: `Bulk-assigned industry "${cleanIndustry}" to ${allowedIds.length} lead(s)`,
+              performedBy: session.name,
+              timestamp: now,
+            },
+          },
+        }
+      );
+
+      // ✅ NEW — keep the GlobalIndustry registry in sync
+      try {
+        const GlobalIndustry = (await import("@/lib/GlobalIndustry")).default;
+        const { normalizeIndustry } = await import("@/lib/industry");
+        await GlobalIndustry.updateOne(
+          { normalized: normalizeIndustry(cleanIndustry) },
+          {
+            $inc: { usageCount: allowedIds.length },
+            $setOnInsert: {
+              name: cleanIndustry,
+              normalized: normalizeIndustry(cleanIndustry),
+              createdBy: session.name,
+              createdById: session.userId,
+            },
+          },
+          { upsert: true }
+        );
+      } catch (e) {
+        console.error("GlobalIndustry sync (bulk) failed:", e);
+      }
+
+      // broadcast each updated lead + return
+      for (const leadId of allowedIds) {
+        const doc = await Inquiry.findById(leadId).lean();
+        if (doc) {
+          try {
+            broadcastLeadUpdate(doc);
+          } catch {}
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        updated: allowedIds.length,
+        skipped: ids.length - allowedIds.length,
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // SINGLE-LEAD PATCH
+    // ─────────────────────────────────────────────────────────
     const inquiry = await Inquiry.findById(id);
     if (!inquiry)
       return NextResponse.json(
@@ -250,6 +428,31 @@ export async function PATCH(req: Request) {
           { status: 403 }
         );
       }
+    }
+
+    // ✅ NEW — industry accuracy guard (warn on similar existing names)
+    if (updates.industry !== undefined && !updates.forceIndustry) {
+      const { similar } = await findIndustryConflict(
+        (updates.industry || "").trim(),
+        { allowExact: true }
+      );
+      if (similar.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            needsConfirmation: true,
+            error: `Similar industries exist: ${similar
+              .slice(0, 3)
+              .join(", ")}. Add anyway?`,
+            similar,
+          },
+          { status: 409 }
+        );
+      }
+    }
+    // strip the force flag so it never hits Mongo
+    if (updates.forceIndustry !== undefined) {
+      delete updates.forceIndustry;
     }
 
     // ── Extract custom payloads BEFORE diffing / $set ──────────────────────
@@ -398,6 +601,9 @@ export async function PATCH(req: Request) {
       });
     }
 
+    // ── Capture old industry BEFORE the update, for registry diff ──────────
+    const oldIndustry = (inquiry as any).industry as string | undefined;
+
     const updated = await Inquiry.findByIdAndUpdate(id, updateQuery, {
       new: true,
     }).lean();
@@ -407,6 +613,43 @@ export async function PATCH(req: Request) {
         { success: false, error: "Update failed" },
         { status: 500 }
       );
+
+    // ✅ NEW — keep the GlobalIndustry registry in sync with single-lead edits
+    try {
+      const newIndustry = (updated as any).industry as string | undefined;
+      if (oldIndustry !== newIndustry) {
+        const GlobalIndustry = (await import("@/lib/GlobalIndustry")).default;
+        const { normalizeIndustry } = await import("@/lib/industry");
+
+        // decrement old (if it existed and no longer used)
+        if (oldIndustry && oldIndustry.trim()) {
+          await GlobalIndustry.updateOne(
+            { normalized: normalizeIndustry(oldIndustry) },
+            { $inc: { usageCount: -1 } }
+          );
+        }
+
+        // increment / upsert new
+        if (newIndustry && newIndustry.trim()) {
+          const raw = newIndustry.trim();
+          await GlobalIndustry.updateOne(
+            { normalized: normalizeIndustry(raw) },
+            {
+              $inc: { usageCount: 1 },
+              $setOnInsert: {
+                name: raw,
+                normalized: normalizeIndustry(raw),
+                createdBy: session.name,
+                createdById: session.userId,
+              },
+            },
+            { upsert: true }
+          );
+        }
+      }
+    } catch (e) {
+      console.error("GlobalIndustry sync (PATCH) failed:", e);
+    }
 
     // ── Send assignment email (non-blocking) ───────────────────────────────
     if (
@@ -447,6 +690,7 @@ export async function PATCH(req: Request) {
     );
   }
 }
+
 // ─────────────────────────────────────────────────────────────
 // DELETE — remove a lead (admin only) + broadcast deletion
 // ─────────────────────────────────────────────────────────────
@@ -482,7 +726,10 @@ export async function DELETE(req: Request) {
       );
 
     // Best-effort: purge all attachments from Cloudinary (non-blocking)
-    if (Array.isArray((deleted as any).attachments) && (deleted as any).attachments.length > 0) {
+    if (
+      Array.isArray((deleted as any).attachments) &&
+      (deleted as any).attachments.length > 0
+    ) {
       cloudinary.v2.config({
         cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
         api_key: process.env.CLOUDINARY_API_KEY,

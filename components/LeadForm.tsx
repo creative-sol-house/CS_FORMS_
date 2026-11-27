@@ -10,6 +10,7 @@ import {
   SocialLink,
 } from "@/lib/types";
 import FileUpload from "@/components/FileUpload";
+import IndustrySelect from "./IndustrySelect";
 
 // Deep-ish equality — handles strings, arrays, objects, dates
 function isEqual(a: any, b: any): boolean {
@@ -27,6 +28,7 @@ function isEqual(a: any, b: any): boolean {
   if (ka.length !== kb.length || ka.join("|") !== kb.join("|")) return false;
   return ka.every((k) => isEqual(a[k], b[k]));
 }
+
 const SERVICES: { value: ServiceCategory; label: string; desc: string }[] = [
   { value: "Automation Software", label: "Automation Software", desc: "Bots, integrations, workflow automation" },
   { value: "Web Development",     label: "Web Development",     desc: "Websites, web apps, e-commerce" },
@@ -104,6 +106,42 @@ interface Props {
 
 type Step = 0 | 1 | 2 | 3 | 4;
 
+/**
+ * ✅ Helper — wraps POST/PATCH and transparently retries with `forceIndustry: true`
+ * when the server returns `409 { needsConfirmation: true }` (similar industry exists).
+ */
+async function submitWithIndustryGuard(
+  url: string,
+  method: "POST" | "PATCH",
+  body: Record<string, any>
+): Promise<any> {
+  const doFetch = (payload: Record<string, any>) =>
+    fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then((r) => r.json());
+
+  let json = await doFetch(body);
+
+  if (!json.success && json.needsConfirmation) {
+    if (typeof window !== "undefined" && window.confirm(json.error)) {
+      if (method === "POST") {
+        json = await doFetch({ ...body, forceIndustry: true });
+      } else {
+        json = await doFetch({
+          ...body,
+          updates: { ...body.updates, forceIndustry: true },
+        });
+      }
+    } else {
+      throw new Error("Cancelled — industry was not added.");
+    }
+  }
+
+  return json;
+}
+
 export default function LeadForm({
   consultantName,
   consultantId,
@@ -132,6 +170,11 @@ export default function LeadForm({
     ...initialData, // (If editing, initialData will override this default)
   }));
 
+  // ✅ NEW — industry state (lives in `data.industry` too, kept in sync below)
+  const [industry, setIndustryState] = useState<string>(
+    (initialData as any)?.industry || ""
+  );
+
   const [attachments, setAttachments] = useState<LeadAttachment[]>(
     () => (initialData?.attachments as LeadAttachment[] | undefined) ?? []
   );
@@ -139,13 +182,19 @@ export default function LeadForm({
   const set = <K extends keyof InquiryData>(k: K, v: InquiryData[K]) =>
     setData((d) => ({ ...d, [k]: v }));
 
+  // ✅ Keep `data.industry` in lockstep with the local `industry` state
+  const setIndustry = (v: string) => {
+    setIndustryState(v);
+    setData((d) => ({ ...d, industry: v } as Partial<InquiryData>));
+  };
+
   const stepErrors = useMemo(() => {
     const e: Record<string, string> = {};
     if (step >= 1) {
       if (!data.companyName?.trim()) e.companyName = "Required";
-if (data.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-  e.email = "Invalid email";
-}
+      if (data.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+        e.email = "Invalid email";
+      }
       if (!data.phone?.trim()) e.phone = "Required";
       else if (!/^[+\d][\d\s\-()]{5,}$/.test(data.phone)) e.phone = "Invalid phone";
       if (!data.country?.trim()) e.country = "Required";
@@ -154,124 +203,131 @@ if (data.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
   }, [data, step]);
   const canAdvance = Object.keys(stepErrors).length === 0;
 
- const submit = async () => {
-  setSaving(true);
-  setErr("");
-  try {
-    const LOCAL_COUNTRY = "Pakistan";
-    const isInternationalClient =
-      !!data.country &&
-      data.country.trim() !== "" &&
-      data.country.trim() !== LOCAL_COUNTRY;
+  const submit = async () => {
+    setSaving(true);
+    setErr("");
+    try {
+      const LOCAL_COUNTRY = "Pakistan";
+      const isInternationalClient =
+        !!data.country &&
+        data.country.trim() !== "" &&
+        data.country.trim() !== LOCAL_COUNTRY;
 
-    // ── EDIT MODE: diff against initialData, send only changes ──────────
-    if (isEdit && initialData) {
-      const updates: Record<string, any> = {};
+      // ── EDIT MODE: diff against initialData, send only changes ──────────
+      if (isEdit && initialData) {
+        const updates: Record<string, any> = {};
 
-      // User-editable fields to consider
-      const fieldsToCheck = Object.keys(data).filter(
-        (k) =>
-          ![
-            "_id", "__v", "createdAt", "updatedAt", "auditLogs",
-            "messages", "attachments", "submissionLocation", "followUps",
-            "createdBy", "createdById", "consultantId", "consultantName",
-            "status", "notes", "assignedTo", "leadCreatedAt",
-            "isInternationalClient", "clientRegion",
-          ].includes(k)
-      );
+        // User-editable fields to consider
+        const fieldsToCheck = Object.keys(data).filter(
+          (k) =>
+            ![
+              "_id", "__v", "createdAt", "updatedAt", "auditLogs",
+              "messages", "attachments", "submissionLocation", "followUps",
+              "createdBy", "createdById", "consultantId", "consultantName",
+              "status", "notes", "assignedTo", "leadCreatedAt",
+              "isInternationalClient", "clientRegion",
+            ].includes(k)
+        );
 
-      for (const key of fieldsToCheck) {
-        const next = (data as any)[key];
-        const prev = (initialData as any)[key];
-        if (!isEqual(next, prev)) {
-          updates[key] = next;
+        for (const key of fieldsToCheck) {
+          const next = (data as any)[key];
+          const prev = (initialData as any)[key];
+          if (!isEqual(next, prev)) {
+            updates[key] = next;
+          }
         }
-      }
 
-      // Service category changed?
-      if (serviceCategory && serviceCategory !== initialData.serviceCategory) {
-        updates.serviceCategory = serviceCategory;
-      }
+        // ✅ Industry — include explicitly in case `data.industry` didn't diff
+        if (
+          industry.trim() !== "" &&
+          industry.trim() !== ((initialData as any)?.industry || "").trim()
+        ) {
+          updates.industry = industry.trim();
+        }
 
-      // Country changed → recompute region flags
-      if (updates.country !== undefined) {
-        updates.isInternationalClient = isInternationalClient;
-        updates.clientRegion = isInternationalClient ? "International" : "Local";
-      }
+        // Service category changed?
+        if (serviceCategory && serviceCategory !== initialData.serviceCategory) {
+          updates.serviceCategory = serviceCategory;
+        }
 
-      // Lead created date changed?
-      if (
-        data.leadCreatedAt &&
-        initialData.leadCreatedAt &&
-        data.leadCreatedAt !== initialData.leadCreatedAt
-      ) {
-        updates.leadCreatedAt = data.leadCreatedAt;
-      }
+        // Country changed → recompute region flags
+        if (updates.country !== undefined) {
+          updates.isInternationalClient = isInternationalClient;
+          updates.clientRegion = isInternationalClient ? "International" : "Local";
+        }
 
-      // ── Attachments: compare by publicId, only send if actually changed
-      const prevIds = (initialData.attachments || [])
-        .map((a: any) => a?.publicId)
-        .filter(Boolean)
-        .sort()
-        .join("|");
-      const nextIds = (attachments || [])
-        .map((a: any) => a?.publicId)
-        .filter(Boolean)
-        .sort()
-        .join("|");
-      if (prevIds !== nextIds) {
-        updates.attachments = attachments;
-      }
+        // Lead created date changed?
+        if (
+          data.leadCreatedAt &&
+          initialData.leadCreatedAt &&
+          data.leadCreatedAt !== initialData.leadCreatedAt
+        ) {
+          updates.leadCreatedAt = data.leadCreatedAt;
+        }
 
-      // Nothing changed → just close
-      if (Object.keys(updates).length === 0) {
+        // ── Attachments: compare by publicId, only send if actually changed
+        const prevIds = (initialData.attachments || [])
+          .map((a: any) => a?.publicId)
+          .filter(Boolean)
+          .sort()
+          .join("|");
+        const nextIds = (attachments || [])
+          .map((a: any) => a?.publicId)
+          .filter(Boolean)
+          .sort()
+          .join("|");
+        if (prevIds !== nextIds) {
+          updates.attachments = attachments;
+        }
+
+        // Nothing changed → just close
+        if (Object.keys(updates).length === 0) {
+          onClose();
+          return;
+        }
+
+        const json = await submitWithIndustryGuard(
+          "/api/admin/inquiries",
+          "PATCH",
+          { id: leadId, updates }
+        );
+
+        if (!json.success) throw new Error(json.error || "Failed to save lead");
+        onSaved(json.inquiry);
         onClose();
         return;
       }
 
-      const res = await fetch("/api/admin/inquiries", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: leadId, updates }),
-      });
+      // ── CREATE MODE: send full payload ──────────────────────────────────
+      const body = {
+        ...data,
+        industry: industry.trim(),
+        country: data.country?.trim() || "",
+        attachments,
+        serviceCategory,
+        isInternationalClient,
+        clientRegion: isInternationalClient ? "International" : "Local",
+        consultantName,
+        consultantId,
+        createdBy: consultantName,
+        createdById: consultantId,
+      };
 
-      const json = await res.json();
+      const json = await submitWithIndustryGuard(
+        "/api/admin/inquiries",
+        "POST",
+        body
+      );
+
       if (!json.success) throw new Error(json.error || "Failed to save lead");
       onSaved(json.inquiry);
       onClose();
-      return;
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
     }
-
-    // ── CREATE MODE: send full payload ──────────────────────────────────
-    const body = {
-      ...data,
-      country: data.country?.trim() || "",
-      attachments,
-      serviceCategory,
-      isInternationalClient,
-      clientRegion: isInternationalClient ? "International" : "Local",
-      consultantName,
-      consultantId,
-      createdBy: consultantName,
-      createdById: consultantId,
-    };
-
-    const res = await fetch("/api/admin/inquiries", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || "Failed to save lead");
-    onSaved(json.inquiry);
-    onClose();
-  } catch (e: any) {
-    setErr(e.message);
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   const progress = useMemo(() => {
     const total = startingService ? 4 : 5;
@@ -341,7 +397,15 @@ if (data.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
               }}
             />
           )}
-          {step === 1 && <StepClient data={data} set={set} errors={stepErrors} />}
+          {step === 1 && (
+            <StepClient
+              data={data}
+              set={set}
+              errors={stepErrors}
+              industry={industry}
+              setIndustry={setIndustry}
+            />
+          )}
           {step === 2 && serviceCategory && (
             <StepServiceDetails
               service={serviceCategory}
@@ -451,17 +515,19 @@ function StepService({ value, onChange }: { value?: ServiceCategory; onChange: (
 
 /* ─────────────── Step 1 ─────────────── */
 function StepClient({
-  data, set, errors,
+  data, set, errors, industry, setIndustry,
 }: {
   data: Partial<InquiryData>;
   set: <K extends keyof InquiryData>(k: K, v: InquiryData[K]) => void;
   errors: Record<string, string>;
+  industry: string;
+  setIndustry: (v: string) => void;
 }) {
   return (
     <div className="space-y-5">
       <SectionHeader title="Client information" subtitle="Basic details so we can reach them." />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Full name"  >
+        <Field label="Full name">
           <TextInput value={data.fullName || ""} onChange={(v) => set("fullName", v)} placeholder="Jane Doe" autoFocus />
         </Field>
         <Field label="Client type" required>
@@ -471,27 +537,27 @@ function StepClient({
             options={[{ value: "Individual", label: "Individual" }, { value: "Business", label: "Business" }]}
           />
         </Field>
-        <Field label="Email"  error={errors.email}>
+        <Field label="Email" error={errors.email}>
           <TextInput type="email" value={data.email || ""} onChange={(v) => set("email", v)} placeholder="jane@company.com" />
         </Field>
         <Field label="Phone" required error={errors.phone}>
           <TextInput type="tel" value={data.phone || ""} onChange={(v) => set("phone", v)} placeholder="+1 555 123 4567" />
         </Field>
 
-<Field label="Country" required error={errors.country}>
-  <SearchableSelect
-    value={data.country || ""}
-    onChange={(v) => set("country", v)}
-    options={COUNTRIES}
-    placeholder="Search country…"
-  />
-  {data.country && data.country !== "Pakistan" && (
-    <p className="mt-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-flex items-center gap-1">
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-      Will be tagged as <strong>International Client</strong>
-    </p>
-  )}
-</Field>
+        <Field label="Country" required error={errors.country}>
+          <SearchableSelect
+            value={data.country || ""}
+            onChange={(v) => set("country", v)}
+            options={COUNTRIES}
+            placeholder="Search country…"
+          />
+          {data.country && data.country !== "Pakistan" && (
+            <p className="mt-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              Will be tagged as <strong>International Client</strong>
+            </p>
+          )}
+        </Field>
 
         {/* ✅ Location */}
         <Field label="Location (City / Region)">
@@ -505,6 +571,14 @@ function StepClient({
         <Field label="Company name required" required error={errors.companyName}>
           <TextInput value={data.companyName || ""} onChange={(v) => set("companyName", v)} placeholder="Acme Inc. " />
         </Field>
+
+        {/* ✅ NEW — Industry (global dropdown with typo warning) */}
+        <div className="sm:col-span-2">
+          <IndustrySelect
+            value={industry}
+            onChange={(v) => setIndustry(v)}
+          />
+        </div>
 
         {/* ✅ Job Title */}
         <Field label="Job Title">
@@ -933,6 +1007,8 @@ function StepReview({
           <Summary label="Country" value={data.country || "—"} />
           <Summary label="Location" value={data.location || "—"} />
           <Summary label="Company" value={data.companyName || "—"} />
+          {/* ✅ NEW — show Industry in the review step */}
+          <Summary label="Industry" value={(data as any).industry || "—"} />
           <Summary label="Job Title" value={data.jobTitle || "—"} />
           <Summary label="Designation" value={data.designation || "—"} />
           <Summary label="Website" value={data.companyWebsite || "—"} />
@@ -1212,7 +1288,7 @@ function SearchableSelect({
 
   return (
     <div ref={wrapRef} className="relative">
-          <input
+      <input
         ref={inputRef}
         value={open ? query : value}
         onChange={(e) => {
@@ -1220,7 +1296,7 @@ function SearchableSelect({
           if (!open) setOpen(true);
           setQuery(val);
           // ✅ UPDATE PARENT IMMEDIATELY AS THEY TYPE
-          onChange(val); 
+          onChange(val);
         }}
         onFocus={() => {
           setOpen(true);
@@ -1245,7 +1321,7 @@ function SearchableSelect({
             setQuery("");
           }
         }}
-               onBlur={() => {
+        onBlur={() => {
           setOpen(false);
           setQuery("");
         }}
