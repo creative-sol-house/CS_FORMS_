@@ -41,10 +41,16 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
   const [error, setError] = useState("");
   const [pendingForce, setPendingForce] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // ✅ Tracks if the current value was explicitly picked or confirmed
+  const [confirmedValue, setConfirmedValue] = useState(value || "");
 
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setInput(value || ""); }, [value]);
+  useEffect(() => { 
+    setInput(value || ""); 
+    setConfirmedValue(value || "");
+  }, [value]);
 
   // Fetch suggestions
   useEffect(() => {
@@ -56,18 +62,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
       setSuggestions(
         DEFAULT_INDUSTRIES.map((name) => ({ name, count: 0, exact: false }))
       );
-      
-      let cancelled = false;
-      (async () => {
-        try {
-          const res = await fetch(`/api/admin/industries?q=`);
-          const data = await res.json();
-          if (!cancelled && data.success && data.suggestions?.length > 0) {
-            // Optional merge
-          }
-        } catch {}
-      })();
-      return () => { cancelled = true; };
+      return;
     }
 
     const t = setTimeout(async () => {
@@ -138,6 +133,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
       setPendingForce(null);
       setWarn([]);
       setInput(finalName);
+      setConfirmedValue(finalName); // ✅ Mark as confirmed
       onChange(finalName, true);
       setSuggestions([]);
       setOpen(false);
@@ -152,6 +148,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
 
   const pickSuggestion = (s: Suggestion) => {
     setInput(s.name);
+    setConfirmedValue(s.name); // ✅ Mark as confirmed when clicked from dropdown
     onChange(s.name, true);
     setOpen(false);
     setPendingForce(null);
@@ -163,7 +160,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
     const trimmed = input.trim();
     if (!trimmed) { onChange(""); return; }
 
-    const exact = suggestions.find((s) => s.exact);
+    const exact = suggestions.find((s) => s.exact || s.name.toLowerCase() === trimmed.toLowerCase());
     if (exact && !force) {
       pickSuggestion(exact);
       return;
@@ -175,11 +172,12 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
   const showDropdown =
     open && !pendingForce && !saving && (suggestions.length > 0 || loading);
 
-  // ✅ NEW: Check if the current input exactly matches a suggestion (meaning it's already an existing industry)
-  const isSelectedFromDropdown = suggestions.some(s => s.name.toLowerCase() === input.trim().toLowerCase());
-  
-  // ✅ NEW: Only show the Add button if there is text, and it's NOT already an existing selection
-  const showAddButton = !saving && input.trim().length > 0 && !isSelectedFromDropdown;
+  // ✅ Logic for Add button: Only show if text exists, it's not confirmed, and it doesn't perfectly match a suggestion.
+  const trimmedInput = input.trim();
+  const isSelectedFromDropdown = suggestions.some(
+    (s) => s.name.toLowerCase() === trimmedInput.toLowerCase()
+  );
+  const showAddButton = !saving && trimmedInput.length > 0 && !isSelectedFromDropdown && trimmedInput !== confirmedValue;
 
   return (
     <div ref={wrapRef} className="relative">
@@ -208,7 +206,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
           }}
         />
         
-        {/* ✅ Only show button if it's a new industry they typed */}
+        {/* ✅ Only shows if they typed something totally new */}
         {showAddButton && (
           <button
             type="button"
@@ -279,12 +277,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
                 type="button"
                 onClick={() => {
                   const pick = warn[0];
-                  setInput(pick);
-                  onChange(pick, true);
-                  setPendingForce(null);
-                  setWarn([]);
-                  setOpen(false);
-                  setSuggestions([]);
+                  pickSuggestion({ name: pick, count: 0, exact: false });
                 }}
                 className="ml-auto px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 rounded-lg"
               >
