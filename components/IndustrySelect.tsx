@@ -13,7 +13,6 @@ interface Props {
   disabled?: boolean;
 }
 
-// These will show up by default when the user clicks the field
 const DEFAULT_INDUSTRIES = [
   "Textile & Garments",
   "Pharmaceuticals",
@@ -54,7 +53,6 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
     if (!q) {
       if (!open) { setSuggestions([]); setLoading(false); return; }
       
-      // Instantly show the default list
       setSuggestions(
         DEFAULT_INDUSTRIES.map((name) => ({ name, count: 0, exact: false }))
       );
@@ -65,7 +63,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
           const res = await fetch(`/api/admin/industries?q=`);
           const data = await res.json();
           if (!cancelled && data.success && data.suggestions?.length > 0) {
-            // Optional: Merge DB items if you want, but defaults are fine for now
+            // Optional merge
           }
         } catch {}
       })();
@@ -177,6 +175,12 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
   const showDropdown =
     open && !pendingForce && !saving && (suggestions.length > 0 || loading);
 
+  // ✅ NEW: Check if the current input exactly matches a suggestion (meaning it's already an existing industry)
+  const isSelectedFromDropdown = suggestions.some(s => s.name.toLowerCase() === input.trim().toLowerCase());
+  
+  // ✅ NEW: Only show the Add button if there is text, and it's NOT already an existing selection
+  const showAddButton = !saving && input.trim().length > 0 && !isSelectedFromDropdown;
+
   return (
     <div ref={wrapRef} className="relative">
       <label className="block text-sm font-medium mb-1">Industry</label>
@@ -196,19 +200,26 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); commit(); }
+            if (e.key === "Enter") { 
+              e.preventDefault(); 
+              if (showAddButton) commit(); 
+            }
             else if (e.key === "Escape") { setOpen(false); setPendingForce(null); }
           }}
         />
-        <button
-          type="button"
-          onClick={() => commit()}
-          disabled={disabled || saving || !input.trim()}
-          className="px-3 py-2 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
-        >
-          {saving && <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
-          {saving ? "Saving…" : "Add"}
-        </button>
+        
+        {/* ✅ Only show button if it's a new industry they typed */}
+        {showAddButton && (
+          <button
+            type="button"
+            onClick={() => commit()}
+            disabled={disabled || saving}
+            className="px-3 py-2 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
+          >
+            {saving && <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+            {saving ? "Saving…" : "Add"}
+          </button>
+        )}
       </div>
 
       {/* Dropdown */}
@@ -228,7 +239,6 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
               className="px-3 py-2 text-sm hover:bg-indigo-50 cursor-pointer flex justify-between items-center"
               onMouseDown={(e) => { e.preventDefault(); pickSuggestion(s); }}
             >
-              {/* ✅ Removed the lead count text here */}
               <span className="text-stone-800">
                 {s.name}
                 {s.exact && (
