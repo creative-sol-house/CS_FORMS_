@@ -42,14 +42,14 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
   const [pendingForce, setPendingForce] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
-  // ✅ Tracks if the current value was explicitly picked or confirmed
-  const [confirmedValue, setConfirmedValue] = useState(value || "");
+  // ✅ Tracks if the user clicked a suggestion from the dropdown
+  const [isSelected, setIsSelected] = useState(Boolean(value));
 
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { 
     setInput(value || ""); 
-    setConfirmedValue(value || "");
+    setIsSelected(Boolean(value));
   }, [value]);
 
   // Fetch suggestions
@@ -133,7 +133,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
       setPendingForce(null);
       setWarn([]);
       setInput(finalName);
-      setConfirmedValue(finalName); // ✅ Mark as confirmed
+      setIsSelected(true); // ✅ Mark as selected/saved
       onChange(finalName, true);
       setSuggestions([]);
       setOpen(false);
@@ -148,7 +148,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
 
   const pickSuggestion = (s: Suggestion) => {
     setInput(s.name);
-    setConfirmedValue(s.name); // ✅ Mark as confirmed when clicked from dropdown
+    setIsSelected(true); // ✅ Mark as selected
     onChange(s.name, true);
     setOpen(false);
     setPendingForce(null);
@@ -160,7 +160,8 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
     const trimmed = input.trim();
     if (!trimmed) { onChange(""); return; }
 
-    const exact = suggestions.find((s) => s.exact || s.name.toLowerCase() === trimmed.toLowerCase());
+    // Find if it matches exactly (ignoring case)
+    const exact = suggestions.find((s) => s.name.toLowerCase() === trimmed.toLowerCase());
     if (exact && !force) {
       pickSuggestion(exact);
       return;
@@ -172,12 +173,8 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
   const showDropdown =
     open && !pendingForce && !saving && (suggestions.length > 0 || loading);
 
-  // ✅ Logic for Add button: Only show if text exists, it's not confirmed, and it doesn't perfectly match a suggestion.
-  const trimmedInput = input.trim();
-  const isSelectedFromDropdown = suggestions.some(
-    (s) => s.name.toLowerCase() === trimmedInput.toLowerCase()
-  );
-  const showAddButton = !saving && trimmedInput.length > 0 && !isSelectedFromDropdown && trimmedInput !== confirmedValue;
+  // ✅ Show Add button ONLY if they haven't selected one, and there is text
+  const showAddButton = !saving && input.trim().length > 0 && !isSelected;
 
   return (
     <div ref={wrapRef} className="relative">
@@ -191,6 +188,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
           placeholder="e.g. Electricity & Power"
           onChange={(e) => {
             setInput(e.target.value);
+            setIsSelected(false); // ✅ Typing means they are creating a new one
             setOpen(true);
             setError("");
             setPendingForce(null);
@@ -206,7 +204,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
           }}
         />
         
-        {/* ✅ Only shows if they typed something totally new */}
+        {/* ✅ The Add button completely disappears if they picked one */}
         {showAddButton && (
           <button
             type="button"
