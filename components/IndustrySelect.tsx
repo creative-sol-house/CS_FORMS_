@@ -13,6 +13,26 @@ interface Props {
   disabled?: boolean;
 }
 
+// These will show up by default when the user clicks the field
+const DEFAULT_INDUSTRIES = [
+  "Textile & Garments",
+  "Pharmaceuticals",
+  "Agriculture",
+  "Food",
+  "Healthcare and Medical",
+  "Education and Training",
+  "Banking & Financial Services",
+  "Retail & E-commerce",
+  "Real Estate & Construction",
+  "Hospitality & Hotels",
+  "Cosmetics & Beauty",
+  "Automotive & Engineering",
+  "Energy & Power",
+  "Telecommunications",
+  "Travel & Tourism",
+  "Professional Services",
+];
+
 export default function IndustrySelect({ value, onChange, disabled }: Props) {
   const [input, setInput] = useState(value || "");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -24,25 +44,30 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
   const [loading, setLoading] = useState(false);
 
   const wrapRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setInput(value || ""); }, [value]);
 
-  // Fetch suggestions (DROPDOWN ONLY)
+  // Fetch suggestions
   useEffect(() => {
     const q = input.trim();
 
     if (!q) {
       if (!open) { setSuggestions([]); setLoading(false); return; }
+      
+      // Instantly show the default list
+      setSuggestions(
+        DEFAULT_INDUSTRIES.map((name) => ({ name, count: 0, exact: false }))
+      );
+      
       let cancelled = false;
       (async () => {
         try {
-          setLoading(true);
           const res = await fetch(`/api/admin/industries?q=`);
           const data = await res.json();
-          if (!cancelled && data.success) setSuggestions(data.suggestions || []);
+          if (!cancelled && data.success && data.suggestions?.length > 0) {
+            // Optional: Merge DB items if you want, but defaults are fine for now
+          }
         } catch {}
-        finally { if (!cancelled) setLoading(false); }
       })();
       return () => { cancelled = true; };
     }
@@ -98,7 +123,6 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
       });
       const json = await res.json();
 
-      // ✅ If backend says similar exists, show the banner NOW
       if (!json.success && json.needsConfirmation) {
         setPendingForce(rawName);
         setWarn(json.similar || []);
@@ -112,7 +136,6 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
         return false;
       }
 
-      // Saved successfully
       const finalName = json.industry?.name || rawName;
       setPendingForce(null);
       setWarn([]);
@@ -148,12 +171,9 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
       return;
     }
 
-    // This triggers the backend check. If similar names exist, the banner appears.
     await saveGlobal(trimmed, force);
   };
 
-  // ✅ Dropdown ONLY shows if we have actual suggestions from the API. 
-  // It does not show because of a warning.
   const showDropdown =
     open && !pendingForce && !saving && (suggestions.length > 0 || loading);
 
@@ -163,7 +183,6 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
 
       <div className="flex gap-2">
         <input
-          ref={inputRef}
           className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 disabled:bg-stone-100"
           value={input}
           disabled={disabled || saving}
@@ -173,7 +192,7 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
             setOpen(true);
             setError("");
             setPendingForce(null);
-            setWarn([]); // Clear previous warnings on typing
+            setWarn([]); 
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
@@ -209,21 +228,19 @@ export default function IndustrySelect({ value, onChange, disabled }: Props) {
               className="px-3 py-2 text-sm hover:bg-indigo-50 cursor-pointer flex justify-between items-center"
               onMouseDown={(e) => { e.preventDefault(); pickSuggestion(s); }}
             >
+              {/* ✅ Removed the lead count text here */}
               <span className="text-stone-800">
                 {s.name}
                 {s.exact && (
                   <span className="ml-2 text-[10px] font-bold uppercase text-emerald-600">existing</span>
                 )}
               </span>
-              <span className="text-xs text-stone-400">
-                {s.count} lead{s.count === 1 ? "" : "s"}
-              </span>
             </li>
           ))}
         </ul>
       )}
 
-      {/* Warning Banner (ONLY appears after clicking "Add") */}
+      {/* Warning Banner */}
       {pendingForce && (
         <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
           <p className="font-semibold text-amber-900 mb-1">
