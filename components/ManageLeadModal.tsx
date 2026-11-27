@@ -337,7 +337,15 @@ export default function ManageLeadModal({
                                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isNote ? "bg-emerald-100 text-emerald-800" : "bg-indigo-100 text-indigo-800"}`}>{log.action}</span>
                                 <span className="text-[10px] font-medium text-stone-400">{new Date(log.timestamp).toLocaleString()}</span>
                               </div>
-                              <p className="text-sm text-stone-700">{log.details}</p>
+                              {/* Replace the single <p> with this: */}
+<div className="text-sm text-stone-700 space-y-1">
+  {(log.details || "").split(" · ").map((part, j) => (
+    <div key={j} className="flex items-start gap-2">
+      <span className="text-stone-400 mt-0.5">•</span>
+      <span className="break-words">{part}</span>
+    </div>
+  ))}
+</div>
                               <p className="text-[10px] text-stone-400 mt-1">by {log.performedBy}</p>
                             </div>
                           </div>

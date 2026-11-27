@@ -11,6 +11,22 @@ import {
 } from "@/lib/types";
 import FileUpload from "@/components/FileUpload";
 
+// Deep-ish equality — handles strings, arrays, objects, dates
+function isEqual(a: any, b: any): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return a == null && b == null;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== "object") return a === b;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => isEqual(v, b[i]));
+  }
+  const ka = Object.keys(a).sort();
+  const kb = Object.keys(b).sort();
+  if (ka.length !== kb.length || ka.join("|") !== kb.join("|")) return false;
+  return ka.every((k) => isEqual(a[k], b[k]));
+}
 const SERVICES: { value: ServiceCategory; label: string; desc: string }[] = [
   { value: "Automation Software", label: "Automation Software", desc: "Bots, integrations, workflow automation" },
   { value: "Web Development",     label: "Web Development",     desc: "Websites, web apps, e-commerce" },
@@ -138,50 +154,124 @@ if (data.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
   }, [data, step]);
   const canAdvance = Object.keys(stepErrors).length === 0;
 
-  const submit = async () => {
-    setSaving(true);
-    setErr("");
-    try {
-// ✅ International client detection — snapshot at save time
-const LOCAL_COUNTRY = "Pakistan";
-const isInternationalClient =
-  !!data.country && data.country.trim() !== "" && data.country.trim() !== LOCAL_COUNTRY;
+ const submit = async () => {
+  setSaving(true);
+  setErr("");
+  try {
+    const LOCAL_COUNTRY = "Pakistan";
+    const isInternationalClient =
+      !!data.country &&
+      data.country.trim() !== "" &&
+      data.country.trim() !== LOCAL_COUNTRY;
 
-const body = {
-  ...data,
-  country: data.country?.trim() || "",
-  attachments,
-  serviceCategory,
-  isInternationalClient,
-  clientRegion: isInternationalClient ? "International" : "Local",
-  consultantName: isEdit ? data.consultantName || consultantName : consultantName,
-  consultantId:  isEdit ? data.consultantId  || consultantId  : consultantId,
-  createdBy:   data.createdBy  || consultantName,
-  createdById: data.createdById || consultantId,
-};
+    // ── EDIT MODE: diff against initialData, send only changes ──────────
+    if (isEdit && initialData) {
+      const updates: Record<string, any> = {};
 
-      const res = isEdit
-        ? await fetch("/api/admin/inquiries", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: leadId, updates: body }),
-          })
-        : await fetch("/api/admin/inquiries", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
+      // User-editable fields to consider
+      const fieldsToCheck = Object.keys(data).filter(
+        (k) =>
+          ![
+            "_id", "__v", "createdAt", "updatedAt", "auditLogs",
+            "messages", "attachments", "submissionLocation", "followUps",
+            "createdBy", "createdById", "consultantId", "consultantName",
+            "status", "notes", "assignedTo", "leadCreatedAt",
+            "isInternationalClient", "clientRegion",
+          ].includes(k)
+      );
+
+      for (const key of fieldsToCheck) {
+        const next = (data as any)[key];
+        const prev = (initialData as any)[key];
+        if (!isEqual(next, prev)) {
+          updates[key] = next;
+        }
+      }
+
+      // Service category changed?
+      if (serviceCategory && serviceCategory !== initialData.serviceCategory) {
+        updates.serviceCategory = serviceCategory;
+      }
+
+      // Country changed → recompute region flags
+      if (updates.country !== undefined) {
+        updates.isInternationalClient = isInternationalClient;
+        updates.clientRegion = isInternationalClient ? "International" : "Local";
+      }
+
+      // Lead created date changed?
+      if (
+        data.leadCreatedAt &&
+        initialData.leadCreatedAt &&
+        data.leadCreatedAt !== initialData.leadCreatedAt
+      ) {
+        updates.leadCreatedAt = data.leadCreatedAt;
+      }
+
+      // ── Attachments: compare by publicId, only send if actually changed
+      const prevIds = (initialData.attachments || [])
+        .map((a: any) => a?.publicId)
+        .filter(Boolean)
+        .sort()
+        .join("|");
+      const nextIds = (attachments || [])
+        .map((a: any) => a?.publicId)
+        .filter(Boolean)
+        .sort()
+        .join("|");
+      if (prevIds !== nextIds) {
+        updates.attachments = attachments;
+      }
+
+      // Nothing changed → just close
+      if (Object.keys(updates).length === 0) {
+        onClose();
+        return;
+      }
+
+      const res = await fetch("/api/admin/inquiries", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: leadId, updates }),
+      });
 
       const json = await res.json();
       if (!json.success) throw new Error(json.error || "Failed to save lead");
       onSaved(json.inquiry);
       onClose();
-    } catch (e: any) {
-      setErr(e.message);
-    } finally {
-      setSaving(false);
+      return;
     }
-  };
+
+    // ── CREATE MODE: send full payload ──────────────────────────────────
+    const body = {
+      ...data,
+      country: data.country?.trim() || "",
+      attachments,
+      serviceCategory,
+      isInternationalClient,
+      clientRegion: isInternationalClient ? "International" : "Local",
+      consultantName,
+      consultantId,
+      createdBy: consultantName,
+      createdById: consultantId,
+    };
+
+    const res = await fetch("/api/admin/inquiries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "Failed to save lead");
+    onSaved(json.inquiry);
+    onClose();
+  } catch (e: any) {
+    setErr(e.message);
+  } finally {
+    setSaving(false);
+  }
+};
 
   const progress = useMemo(() => {
     const total = startingService ? 4 : 5;

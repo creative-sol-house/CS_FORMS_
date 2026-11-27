@@ -11,6 +11,8 @@ import {
 } from "@/lib/mailer";
 import { broadcastLeadUpdate } from "./stream/route";
 import cloudinary from "cloudinary";
+import { buildFieldDiffs, diffAttachments } from "@/lib/auditDiff";
+
 
 async function getSession() {
   const cookieStore = await cookies();
@@ -193,6 +195,10 @@ if (
 // PATCH — update lead fields, notes, assignment, chat messages,
 //         read receipts, attachments, and broadcast changes via SSE
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// PATCH — update lead fields, notes, assignment, chat messages,
+//         read receipts, attachments, and broadcast changes via SSE
+// ─────────────────────────────────────────────────────────────
 export async function PATCH(req: Request) {
   try {
     const session = await getSession();
@@ -246,17 +252,13 @@ export async function PATCH(req: Request) {
       }
     }
 
-    const logDetails: string[] = [];
-    const notesChanged =
-      updates.notes !== undefined && updates.notes !== inquiry.notes;
-
-    // Extract custom payloads BEFORE assigning to $set
+    // ── Extract custom payloads BEFORE diffing / $set ──────────────────────
     const newMessage: string | undefined = updates.newMessage;
     const markRead: boolean = !!updates.markRead;
     delete updates.newMessage;
     delete updates.markRead;
 
-    // ── FIX: Delete immutable/system fields to prevent MongoDB conflicts ──
+    // ── Delete immutable/system fields to prevent MongoDB conflicts ────────
     delete updates._id;
     delete updates.auditLogs;
     delete updates.messages;
@@ -264,7 +266,7 @@ export async function PATCH(req: Request) {
     delete updates.updatedAt;
     delete updates.__v;
 
-    // ✅ NEW — normalize leadCreatedAt so Mongo stores a real Date
+    // ── Normalize leadCreatedAt so Mongo stores a real Date ────────────────
     if (updates.leadCreatedAt !== undefined) {
       const parsed = updates.leadCreatedAt
         ? new Date(updates.leadCreatedAt)
@@ -273,33 +275,56 @@ export async function PATCH(req: Request) {
         parsed && !isNaN(parsed.getTime()) ? parsed : new Date();
     }
 
-    if (updates.status && updates.status !== inquiry.status)
-      logDetails.push(`Status: ${inquiry.status} → ${updates.status}`);
-    if (
-      updates.assignedTo !== undefined &&
-      updates.assignedTo !== inquiry.assignedTo
-    )
-      logDetails.push(`Assigned to: ${updates.assignedTo || "Unassigned"}`);
+    // ── Build human-readable field diffs ───────────────────────────────────
+    const fieldDiffs = buildFieldDiffs(inquiry.toObject(), updates);
 
-    // ✅ NEW — log Lead Created date change
-    if (updates.leadCreatedAt !== undefined) {
-      const prev = (inquiry as any).leadCreatedAt
-        ? new Date((inquiry as any).leadCreatedAt)
-        : null;
-      const next = updates.leadCreatedAt as Date;
-      const prevTime = prev ? prev.getTime() : 0;
-      if (prevTime !== next.getTime()) {
-        logDetails.push(
-          `Lead created date: ${
-            prev ? prev.toLocaleString() : "—"
-          } → ${next.toLocaleString()}`
+    // ── Notes handled separately (full text, not truncated) ────────────────
+    const notesChanged =
+      updates.notes !== undefined &&
+      (updates.notes || "").trim() !== (inquiry.notes || "").trim();
+    const nextNotes = updates.notes;
+    delete updates.notes; // don't let generic diff handle it
+
+    // ── Attachments: only log if files actually changed ────────────────────
+    let attachmentMsg: string | null = null;
+    const attachmentRemovals: string[] = [];
+
+    if (
+      updates.attachments !== undefined &&
+      Array.isArray(updates.attachments)
+    ) {
+      attachmentMsg = diffAttachments(
+        (inquiry.attachments as any[]) || [],
+        updates.attachments
+      );
+
+      if (attachmentMsg === null) {
+        // ✅ No real change → drop attachments from $set entirely
+        delete updates.attachments;
+      } else {
+        // ✅ Real change → compute which files to purge from Cloudinary
+        const newIds = new Set(
+          updates.attachments
+            .map((a: any) => a?.publicId)
+            .filter((v: any): v is string => typeof v === "string" && !!v)
         );
+        for (const a of (inquiry.attachments as any[]) || []) {
+          if (a?.publicId && !newIds.has(a.publicId)) {
+            attachmentRemovals.push(a.publicId);
+          }
+        }
       }
     }
 
+    // ── Build update query ─────────────────────────────────────────────────
     const updateQuery: any = { $set: { ...updates } };
 
-    // ── Append new chat message
+    // Re-apply notes to $set (we deleted it above)
+    if (notesChanged) {
+      updateQuery.$set.notes = nextNotes;
+    }
+
+    // ── Append new chat message ────────────────────────────────────────────
     if (newMessage && newMessage.trim().length > 0) {
       const text = newMessage.trim().slice(0, 4000);
       updateQuery.$push = updateQuery.$push || {};
@@ -312,79 +337,56 @@ export async function PATCH(req: Request) {
       };
     }
 
-    // ── Append audit log entries
+    // ── Append audit log entries ───────────────────────────────────────────
     const auditEntries: any[] = [];
-    if (logDetails.length > 0) {
+
+    if (fieldDiffs.length > 0) {
       auditEntries.push({
         action: "Update",
-        details: logDetails.join(", "),
+        details: fieldDiffs.join(" · "),
         performedBy: session.name,
         timestamp: new Date(),
       });
     }
+
     if (notesChanged) {
       auditEntries.push({
         action: "Note",
-        details: updates.notes?.trim() || "(cleared)",
+        details: (nextNotes || "").trim().slice(0, 500) || "(cleared)",
         performedBy: session.name,
         timestamp: new Date(),
       });
     }
 
-     // ── ATTACHMENTS AUDIT + CLEANUP ─────────────────────────────────────
-    if (updates.attachments !== undefined && Array.isArray(updates.attachments)) {
-      const newIds = new Set<string>(
-        updates.attachments
-          .map((a: any) => a?.publicId)
-          .filter((v: any): v is string => typeof v === "string" && !!v)
-      );
-
-      const oldIds = new Set<string>(
-        Array.isArray(inquiry.attachments)
-          ? (inquiry.attachments as any[])
-              .map((a) => a?.publicId)
-              .filter((v: any): v is string => typeof v === "string" && !!v)
-          : []
-      );
-
-      // Find what was added and what was removed
-      const addedIds = [...newIds].filter((id) => !oldIds.has(id));
-      const removedIds = [...oldIds].filter((id) => !newIds.has(id));
-
-      // ✅ FIX: ONLY log an audit entry if files were actually added or removed!
-      if (addedIds.length > 0 || removedIds.length > 0) {
-        const parts = [];
-        if (addedIds.length > 0) parts.push(`${addedIds.length} added`);
-        if (removedIds.length > 0) parts.push(`${removedIds.length} removed`);
-
-        auditEntries.push({
-          action: "Attachments",
-          details: `Files changed: ${parts.join(", ")}`,
-          performedBy: session.name,
-          timestamp: new Date(),
-        });
-      }
-
-      if (removedIds.length > 0) {
-        cloudinary.v2.config({
-          cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-          api_key: process.env.CLOUDINARY_API_KEY,
-          api_secret: process.env.CLOUDINARY_API_SECRET,
-        });
-        Promise.allSettled(
-          removedIds.map((pid) =>
-            cloudinary.v2.uploader.destroy(pid, { resource_type: "raw" })
-          )
-        ).catch((e) => console.error("Cloudinary cleanup failed:", e));
-      }
+    if (attachmentMsg) {
+      auditEntries.push({
+        action: "Attachments",
+        details: attachmentMsg,
+        performedBy: session.name,
+        timestamp: new Date(),
+      });
     }
-    
+
     if (auditEntries.length > 0) {
       updateQuery.$push = updateQuery.$push || {};
       updateQuery.$push.auditLogs = { $each: auditEntries };
     }
 
-    // ── Read receipts: mark every message not sent by me as read
+    // ── Cloudinary cleanup for removed files ───────────────────────────────
+    if (attachmentRemovals.length > 0) {
+      cloudinary.v2.config({
+        cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+      });
+      Promise.allSettled(
+        attachmentRemovals.map((pid) =>
+          cloudinary.v2.uploader.destroy(pid, { resource_type: "raw" })
+        )
+      ).catch((e) => console.error("Cloudinary cleanup failed:", e));
+    }
+
+    // ── Read receipts: mark every message not sent by me as read ───────────
     if (markRead) {
       inquiry.messages.forEach((msg: any, idx: number) => {
         if (msg.sender !== session.name && !msg.readBy?.includes(session.name)) {
@@ -406,7 +408,7 @@ export async function PATCH(req: Request) {
         { status: 500 }
       );
 
-    // ── Send assignment email (non-blocking)
+    // ── Send assignment email (non-blocking) ───────────────────────────────
     if (
       updates.assignedTo !== undefined &&
       updates.assignedTo !== inquiry.assignedTo &&
@@ -429,7 +431,7 @@ export async function PATCH(req: Request) {
       }
     }
 
-    // ── Broadcast to all connected clients (SSE)
+    // ── Broadcast to all connected clients (SSE) ───────────────────────────
     try {
       broadcastLeadUpdate(updated);
     } catch (e) {
@@ -445,7 +447,6 @@ export async function PATCH(req: Request) {
     );
   }
 }
-
 // ─────────────────────────────────────────────────────────────
 // DELETE — remove a lead (admin only) + broadcast deletion
 // ─────────────────────────────────────────────────────────────
